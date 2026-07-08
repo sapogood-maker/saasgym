@@ -2,13 +2,14 @@
 
 PostgreSQL + Prisma ORM. Schema em `backend/prisma/schema.prisma`, migrations em `backend/prisma/migrations/`.
 
-## Implementado (Sprint 0)
+## Implementado (Sprint 0 + Sprint 1)
 
-`Academia` (tenant), `User` (identidade de login), `RefreshToken`. Ver `backend/prisma/schema.prisma` para os campos exatos.
+`Academia` (tenant), `User` (identidade de login), `RefreshToken`, `AuditLog`. Ver `backend/prisma/schema.prisma` para os campos exatos.
 
 - `Academia.status`: `TRIAL | ATIVA | INATIVA`.
-- `User.academiaId` é **nulo apenas** para `role = SYSTEM_ADMIN`.
-- `RefreshToken` guarda o **hash** do token (nunca o token em texto puro), com `revokedAt`/`replacedBy` para suportar rotação e revogação.
+- `User.academiaId` é **nulo apenas** para `role = SYSTEM_ADMIN`. `User.passwordChangedAt` (Sprint 1) registra a última troca de senha.
+- `RefreshToken` guarda o **hash** do token (SHA-256, nunca o token em texto puro), com `revokedAt`/`replacedBy` para rotação e revogação, e `ipAddress`/`userAgent`/`lastUsedAt` (Sprint 1) — cada linha é, na prática, uma sessão (ver `docs/10-auth.md`).
+- `AuditLog` (Sprint 1) — trilha de eventos de autenticação (`AuditAction`: `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGOUT`, `PASSWORD_CHANGED`, `REFRESH_TOKEN_USED`, `REFRESH_TOKEN_REUSE_DETECTED`, `SESSION_REVOKED`), sem FK obrigatória para `User` (login falho pode não corresponder a nenhum usuário real — usa `identifier` para guardar o e-mail tentado).
 
 ## Modelagem planejada (sprints seguintes)
 

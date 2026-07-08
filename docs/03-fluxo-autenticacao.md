@@ -1,6 +1,6 @@
 # Fluxo de Autenticação
 
-> Implementação prevista para o Sprint 1. Este documento define o contrato desde já para que backend e os dois frontends sejam construídos de forma consistente.
+> **Implementado no Sprint 1** — este documento é o desenho original (Sprint 0), mantido como registro histórico da decisão. Para os endpoints, comportamento real e detalhes de implementação, ver `docs/10-auth.md` (autenticação), `docs/11-security.md` (segurança) e `docs/12-multi-tenant.md` (isolamento por tenant).
 
 ## Perfis (`Role`)
 

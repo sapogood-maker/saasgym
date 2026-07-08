@@ -5,8 +5,8 @@ Cada sprint termina com o projeto compilando, rodando via Docker Compose local, 
 | Sprint | Entrega | Status |
 |---|---|---|
 | **0 — Fundação** | Estrutura de pastas; NestJS bootstrap + Swagger + health-check; Prisma inicial (`Academia`, `User`, `RefreshToken`); workspace Melos + `shared_core` skeleton; `docker-compose.yml` local; CI skeleton; docs base. | ✅ Concluído |
-| **1 — Autenticação & Multi-tenant** | Módulo `auth` completo (login/refresh/logout, guards, decorators); `TenantContext` + filtro automático por `academiaId`; CRUD `Academias` (system admin); seed inicial; telas de login em `admin_web`/`student_web`. | Próximo |
-| **2 — Alunos & Professores** | CRUD `Aluno` (com upload de foto via `StorageProvider`); CRUD `Professor`; telas de listagem/cadastro/edição no `admin_web`. | Planejado |
+| **1 — Autenticação, Autorização & Multi-tenant** | Módulo `auth` completo (login/refresh com rotação e detecção de reuso/logout/troca de senha); guards (`JwtAuthGuard`/`RolesGuard`/`AcademiaGuard`/`SystemAdminGuard`) e decorators (`@Public`/`@Roles`/`@CurrentUser`/`@CurrentAcademia`); `TenantContext` (AsyncLocalStorage) + extensão do Prisma com filtro automático por `academiaId`; auditoria (`AuditLog`); hardening (Helmet, rate limiting, filtro global de exceções); CI com Postgres de serviço + e2e. | ✅ Concluído |
+| **2 — Alunos & Professores** | CRUD `Aluno` (com upload de foto via `StorageProvider`); CRUD `Professor`; telas de listagem/cadastro/edição no `admin_web`; primeiro uso real de `AcademiaGuard`/`RolesGuard`/`forTenant()` em endpoints de negócio; telas de login em `admin_web`/`student_web` consumindo o módulo `auth`. | Próximo |
 | **3 — Planos & Modalidades** | CRUD `Plano`, `Modalidade`; matrícula do aluno em um plano (`Matricula`). | Planejado |
 | **4 — Agenda (núcleo)** | `Turma`, geração de `Aula`, `AulaAluno` (matrícula, capacidade máxima, fila de espera); tela de agenda semanal. | Planejado |
 | **5 — Agenda avançada** | Reposições e `SolicitacaoAgenda` (troca de horário); interface `NotificationProvider` preparada (sem envio real). | Planejado |
@@ -15,7 +15,7 @@ Cada sprint termina com o projeto compilando, rodando via Docker Compose local, 
 | **8 — Backup** | `StorageProvider` finalizado + `GoogleDriveProvider`; módulo `backup` (pg_dump → zip → upload manual, histórico). | Planejado |
 | **9 — Portal do Aluno (MVP)** | `student_web`: login, agenda, pagamentos (visualização), atualização de dados, presença, avisos, solicitar troca/reposição. | Planejado |
 | **10 — Treinos (estrutura)** | CRUD `Exercicio`, `Treino`, `TreinoExercicio`; upload de foto/vídeo. Sem IA. | Planejado |
-| **11 — Hardening & Deploy produção** | Testes automatizados; rate limiting; logging estruturado; CI/CD completo; deploy Coolify (staging + produção); revisão final da documentação. | Planejado |
+| **11 — Deploy produção & revisão final** | Logging estruturado; deploy Coolify (staging + produção); revisão final da documentação e da cobertura de testes de todos os módulos de negócio. (Testes automatizados, rate limiting e filtro global de exceções já entregues no Sprint 1.) | Planejado |
 
 ## Decisões em aberto (não bloqueiam o início dos sprints correspondentes)
 
