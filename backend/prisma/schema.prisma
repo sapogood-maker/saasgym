@@ -37,6 +37,16 @@ enum UserStatus {
   INATIVO
 }
 
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
+  PASSWORD_CHANGED
+  REFRESH_TOKEN_USED
+  REFRESH_TOKEN_REUSE_DETECTED
+  SESSION_REVOKED
+}
+
 /// Tenant: cada academia cliente do SaaS.
 model Academia {
   id        String         @id @default(uuid())
@@ -61,12 +71,13 @@ model User {
   academiaId String?
   academia  Academia?  @relation(fields: [academiaId], references: [id], onDelete: Cascade)
 
-  nome        String
-  email       String     @unique
-  senhaHash   String
-  role        Role
-  status      UserStatus @default(ATIVO)
-  lastLoginAt DateTime?
+  nome              String
+  email             String     @unique
+  senhaHash         String
+  role              Role
+  status            UserStatus @default(ATIVO)
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -77,7 +88,9 @@ model User {
   @@map("users")
 }
 
-/// Tokens de refresh, com suporte a rotação e revogação.
+/// Tokens de refresh — cada um representa uma sessão (rotacionada via
+/// "replacedBy" a cada /auth/refresh). A sessão ativa é o token no fim da
+/// cadeia que ainda não foi revogado.
 model RefreshToken {
   id         String    @id @default(uuid())
   userId     String
@@ -86,8 +99,31 @@ model RefreshToken {
   expiresAt  DateTime
   revokedAt  DateTime?
   replacedBy String?
+  ipAddress  String?
+  userAgent  String?
+  lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+/// Trilha de auditoria de eventos de autenticação. "identifier" guarda o
+/// e-mail tentado em falhas de login antes de se resolver a um usuário real
+/// — por isso userId/academiaId são opcionais aqui.
+model AuditLog {
+  id         String      @id @default(uuid())
+  academiaId String?
+  userId     String?
+  identifier String?
+  action     AuditAction
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([academiaId])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
 }

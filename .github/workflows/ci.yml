@@ -12,6 +12,26 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: saasgym
+          POSTGRES_PASSWORD: saasgym
+          POSTGRES_DB: saasgym
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U saasgym -d saasgym"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: "postgresql://saasgym:saasgym@localhost:5432/saasgym?schema=public"
+      JWT_ACCESS_SECRET: "ci-access-secret-0000000000000000000000"
+      JWT_REFRESH_SECRET: "ci-refresh-secret-0000000000000000000000"
+      CORS_ORIGINS: "http://localhost:5000,http://localhost:5001"
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v5
 
@@ -26,6 +46,8 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test
+      - run: npx prisma migrate deploy
+      - run: npm run test:e2e
 
   flutter:
     runs-on: ubuntu-latest
