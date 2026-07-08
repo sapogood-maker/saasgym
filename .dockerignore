@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/build
+**/*.tsbuildinfo
+**/.dart_tool
+**/.git
+**/coverage
+backend/.env
+infra/.env
+backups
+docs

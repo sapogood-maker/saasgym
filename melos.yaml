@@ -1,0 +1,19 @@
+name: saasgym
+
+packages:
+  - admin_web
+  - student_web
+  - packages/**
+
+command:
+  bootstrap:
+    runPubGetInParallel: false
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze
+    description: Roda o analyzer em todos os pacotes Flutter do workspace.
+
+  test:
+    run: melos exec -- flutter test
+    description: Roda os testes de todos os pacotes Flutter do workspace.

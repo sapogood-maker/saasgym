@@ -1,0 +1,93 @@
+// SaaSGym - Schema inicial (Sprint 0)
+// Escopo desta migration: fundação de identidade e tenant.
+// Demais entidades (Aluno, Professor, Plano, Agenda, Financeiro, Treinos...)
+// são adicionadas incrementalmente nos sprints seguintes (ver docs/02-banco-de-dados.md).
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" cobre o dev local (Windows/macOS/Linux glibc); a imagem de
+  // produção roda em node:22-alpine (musl + OpenSSL 3), que precisa do
+  // binary target explícito abaixo — sem isso o Prisma tenta detectar o
+  // OpenSSL do container e falha silenciosamente para "openssl-1.1.x",
+  // que não existe no Alpine 3.24+.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SYSTEM_ADMIN
+  ACADEMIA_ADMIN
+  RECEPCIONISTA
+  PROFESSOR
+  ALUNO
+}
+
+enum AcademiaStatus {
+  TRIAL
+  ATIVA
+  INATIVA
+}
+
+enum UserStatus {
+  ATIVO
+  INATIVO
+}
+
+/// Tenant: cada academia cliente do SaaS.
+model Academia {
+  id        String         @id @default(uuid())
+  nome      String
+  cnpj      String?        @unique
+  email     String?
+  telefone  String?
+  endereco  String?
+  logoUrl   String?
+  status    AcademiaStatus @default(TRIAL)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  users User[]
+
+  @@map("academias")
+}
+
+/// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
+model User {
+  id        String     @id @default(uuid())
+  academiaId String?
+  academia  Academia?  @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  nome        String
+  email       String     @unique
+  senhaHash   String
+  role        Role
+  status      UserStatus @default(ATIVO)
+  lastLoginAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+
+  @@index([academiaId])
+  @@map("users")
+}
+
+/// Tokens de refresh, com suporte a rotação e revogação.
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
