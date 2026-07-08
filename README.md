@@ -43,3 +43,7 @@ Infra: Docker Compose, GitHub, Coolify.
 ## Roadmap
 
 Ver [`docs/08-roadmap.md`](docs/08-roadmap.md).
+
+## Versões
+
+Ver [`CHANGELOG.md`](CHANGELOG.md) — release atual: `v0.2.0`.
