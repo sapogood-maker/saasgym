@@ -6,6 +6,8 @@
 
 **Metodologia:** todos os testes abaixo foram executados de verdade, não apenas revisados estaticamente. Como esta máquina não tinha Docker instalado, instalei Docker Engine em um WSL2 Ubuntu já presente no sistema e rodei os containers reais contra o código do repositório (`D:\saasgym`, montado em `/mnt/d/saasgym`). Isso encontrou **10 bugs reais** (listados na seção de Riscos/Correções) que uma revisão de código sozinha não teria pego.
 
+**Atualização pós-commit:** o primeiro push para `https://github.com/sapogood-maker/saasgym` rodou o CI (`.github/workflows/ci.yml`) num runner do GitHub — ambiente ainda mais "zerado" que o WSL sandbox usado até aqui — e pegou **mais 2 bugs reais** que não tinham aparecido antes: `npm run test` falhava por não existir nenhum teste unitário (`*.spec.ts`) no backend, e `flutter test` rodava na raiz do workspace, onde não existe pasta `test/`. Ambos corrigidos (teste unitário real para a validação de segredo JWT + `flutter test` por pacote no CI) e revalidados — CI verde em `433ce7b`. A tag `v0.1.0` no GitHub aponta para esse commit (o primeiro commit, com CI quebrado, foi substituído deliberadamente — ver histórico do repositório).
+
 ---
 
 ## Teste 1 — `docker compose -f infra/docker-compose.yml up --build`
@@ -128,8 +130,10 @@ Revisão registrada em `docs/06-deploy-coolify.md` (atualizado nesta sessão). P
 | 8 | `tsconfig.build.tsbuildinfo` (cache incremental do TypeScript) vazava para o contexto de build do Docker e também confundia builds locais, fazendo o `tsc` reportar sucesso sem emitir nenhum `.js` | backend/.dockerignore + tsconfig | Build "silenciosamente" quebrado — parece ter funcionado mas a imagem não roda |
 | 9 | `bcrypt@5.1.1` trazia `node-pre-gyp`→`tar` com vulnerabilidades **altas** de path traversal | backend | Risco de segurança em tempo de build (instalação de dependências) |
 | 10 | Segredos JWT sem validação de força mínima (e o próprio `.env.example` tinha um segredo curto demais) | backend | Projeto aceitaria subir em produção com um segredo trivialmente fraco |
+| 11 | `npm run test` falhava — nenhum arquivo `*.spec.ts` existia (só o e2e-spec, que precisa de banco) | backend/CI | Pipeline de CI vermelho a cada push |
+| 12 | `flutter test` no CI rodava na raiz do workspace, onde não existe pasta `test/` | CI | Pipeline de CI vermelho a cada push |
 
-Todos os 10 itens foram corrigidos e reverificados rodando o projeto de verdade (não apenas relidos).
+Todos os 12 itens foram corrigidos e reverificados rodando o projeto de verdade (não apenas relidos) — os itens 11 e 12 foram inclusive pegos pelo próprio CI do GitHub Actions após o primeiro push, confirmando o valor de testar em mais de um ambiente.
 
 ---
 
@@ -143,6 +147,7 @@ Todos os 10 itens foram corrigidos e reverificados rodando o projeto de verdade 
 - Segredos nunca commitados; validação de ambiente rejeita configuração fraca no boot.
 - Documentação (`docs/`) reflete o estado real do código, incluindo a distinção explícita entre uso local (`infra/docker-compose.yml`) e produção (Coolify).
 - CORS testado e comprovadamente restritivo.
+- Repositório publicado em `https://github.com/sapogood-maker/saasgym`, CI verde (`main`, tag `v0.1.0`), checklist prático de deploy em `docs/09-checklist-deploy-coolify.md`.
 
 ## Pontos pendentes
 
@@ -177,7 +182,7 @@ Revalidação completa depois das mudanças: `docker compose up --build` dos 4 s
 |---|---|---|
 | **Arquitetura** | **9/10** | Multi-tenant, separação de responsabilidades e abstrações (storage, auth) bem desenhadas desde o Sprint 0; não é 10 só porque a maior parte dos módulos de negócio ainda não existe (esperado nesta fase). |
 | **Docker** | **10/10** | 8 bugs reais de Docker/build encontrados e corrigidos com validação real; imagens enxutas (backend 499MB, frontends 123MB cada), non-root, healthchecks funcionais, boa cache de camadas, builds 100% reproduzíveis (todas as imagens-base por digest), zero redundância (`prisma generate` único), `hadolint` sem nenhum aviso. |
-| **Deploy** | **8/10** | Fluxo Coolify bem documentado e tecnicamente compatível (portas, restart policy, healthchecks, migrations automáticas); não é validado num Coolify real ainda — recomendação prática antes do go-live. |
+| **Deploy** | **8/10** | Fluxo Coolify bem documentado e tecnicamente compatível (portas, restart policy, healthchecks, migrations automáticas); CI verde num runner GitHub genuinamente zerado e checklist prático de deploy pronto (`docs/09-checklist-deploy-coolify.md`); não é 10 porque ainda falta a execução real num Coolify de verdade. |
 | **Escalabilidade** | **8/10** | Decisões corretas para SaaS multi-tenant de verdade (JWT stateless, sem sessão fixada, storage abstraído do disco local, banco único com `academiaId` indexável); mecanismos de proteção em runtime (rate limiting, pool de conexões) ainda não implementados — planejados para sprints futuros, não uma falha atual. |
 | **Nota geral do projeto** | **8,8/10** | Fundação sólida e genuinamente testada, não apenas revisada. Os bugs encontrados são exatamente o tipo de problema que só aparece rodando de verdade — todos corrigidos e reverificados. Os pontos que faltam para 10 em Deploy/Escalabilidade dependem de execução real (deploy no Coolify) ou são trabalho de sprint futuro por desenho, não lacunas do que foi entregue agora. |
 
@@ -185,4 +190,6 @@ Revalidação completa depois das mudanças: `docker compose up --build` dos 4 s
 
 ## Conclusão
 
-O projeto está pronto para o primeiro commit e para a configuração do Coolify. O `docker compose -f infra/docker-compose.yml up --build` dos 4 serviços a partir de cache **zero** (sem nenhuma imagem, sem nenhuma camada de build anterior) foi concluído com sucesso durante esta validação — único ponto em aberto era a confirmação dessa rodada, que terminou saudável nos 4 containers e com todos os endpoints respondendo. Segue como recomendação prática (não bloqueante) apenas testar a mesma sequência no ambiente real de produção, já que a rede até `ghcr.io` neste sandbox foi visivelmente mais lenta que o normal.
+Sprint 0 concluído. O projeto foi commitado, versionado como `v0.1.0` e publicado em `https://github.com/sapogood-maker/saasgym`, com CI verde no GitHub Actions — a validação mais forte possível de "funciona numa máquina zerada", já que rodou num runner do GitHub sem qualquer relação com este ambiente de teste. O `docker compose -f infra/docker-compose.yml up --build` dos 4 serviços a partir de cache Docker **zero** também foi concluído com sucesso local. O checklist prático de deploy está pronto em `docs/09-checklist-deploy-coolify.md`. Falta apenas a execução real no Coolify — passo que só o usuário pode dar, com acesso à própria infraestrutura.
+
+A partir daqui, a fundação está congelada e o próximo passo é o **Sprint 1 — Autenticação + Multi-tenant**.
