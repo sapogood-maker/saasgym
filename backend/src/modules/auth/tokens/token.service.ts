@@ -37,12 +37,6 @@ export class TokenService {
     });
   }
 
-  verifyAccessToken(token: string): Promise<AccessTokenPayload> {
-    return this.jwtService.verifyAsync<AccessTokenPayload>(token, {
-      secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-    });
-  }
-
   issueRefreshToken(): IssuedRefreshToken {
     const raw = randomBytes(64).toString('hex');
     return {

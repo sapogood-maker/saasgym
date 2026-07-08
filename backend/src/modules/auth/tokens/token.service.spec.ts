@@ -5,11 +5,11 @@ import { TokenService } from './token.service';
 
 describe('TokenService', () => {
   let service: TokenService;
-  let jwtService: { signAsync: jest.Mock; verifyAsync: jest.Mock };
+  let jwtService: { signAsync: jest.Mock };
   let configService: { get: jest.Mock };
 
   beforeEach(() => {
-    jwtService = { signAsync: jest.fn().mockResolvedValue('jwt-assinado'), verifyAsync: jest.fn() };
+    jwtService = { signAsync: jest.fn().mockResolvedValue('jwt-assinado') };
     configService = {
       get: jest.fn((key: string, fallback?: unknown) => {
         const values: Record<string, string> = {
@@ -67,23 +67,6 @@ describe('TokenService', () => {
 
     it('hashes diferentes para tokens diferentes', () => {
       expect(service.hashRefreshToken('abc')).not.toBe(service.hashRefreshToken('abd'));
-    });
-  });
-
-  describe('verifyAccessToken', () => {
-    it('delega para JwtService.verifyAsync com o secret correto', async () => {
-      jwtService.verifyAsync.mockResolvedValue({
-        sub: 'user-1',
-        academiaId: null,
-        role: Role.SYSTEM_ADMIN,
-      });
-
-      const payload = await service.verifyAccessToken('algum-token');
-
-      expect(payload.sub).toBe('user-1');
-      expect(jwtService.verifyAsync).toHaveBeenCalledWith('algum-token', {
-        secret: 'access-secret',
-      });
     });
   });
 });

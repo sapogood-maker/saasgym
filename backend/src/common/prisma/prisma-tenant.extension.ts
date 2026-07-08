@@ -20,6 +20,7 @@ const WHERE_OPERATIONS = new Set([
   'deleteMany',
   'count',
   'aggregate',
+  'groupBy',
 ]);
 
 /// Injeta automaticamente `academiaId` (lido do TenantContext, nunca do
@@ -60,6 +61,17 @@ export function createTenantExtension(tenantContext: TenantContextService) {
               (args as { data: Record<string, unknown>[] }).data = (
                 args as { data: Record<string, unknown>[] }
               ).data.map((item) => ({ ...item, academiaId }));
+            }
+
+            // upsert tem forma própria (where + create + update juntos) —
+            // não é coberto por WHERE_OPERATIONS nem pelo branch de "create"
+            // acima. Sem isso, o branch de update do upsert acharia (e
+            // sobrescreveria) um registro de outra academia pelo id, e o
+            // branch de create nasceria sem academiaId.
+            if (operation === 'upsert') {
+              const upsertArgs = args as { where?: Record<string, unknown>; create?: unknown };
+              upsertArgs.where = { ...upsertArgs.where, academiaId };
+              upsertArgs.create = { ...(upsertArgs.create as Record<string, unknown>), academiaId };
             }
 
             return query(queryArgs as typeof args);

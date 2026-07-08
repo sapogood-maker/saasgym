@@ -53,18 +53,18 @@ Ver `docs/10-auth.md` para o documento completo. Resumo: login emite access toke
 
 ## 4. Cobertura de testes
 
-**84 testes, todos passando** — 57 unitários (sem banco) + 27 e2e (Postgres real), confirmados três vezes de forma independente: localmente via container Docker isolado, numa simulação completa da sequência do CI, e no próprio GitHub Actions (runner genuinamente zerado).
+**87 testes, todos passando** — 56 unitários (sem banco) + 31 e2e (Postgres real), confirmados de forma independente: localmente via container Docker isolado, numa simulação completa da sequência do CI, no próprio GitHub Actions (runner genuinamente zerado), e mais uma vez após a revisão arquitetural pré-`v0.2.0`.
 
 | Camada | O que cobre |
 |---|---|
 | Guards (unit) | `JwtAuthGuard`, `RolesGuard`, `AcademiaGuard`, `SystemAdminGuard` — cada combinação de permissão, isoladamente |
 | Guards (integração HTTP) | Os 4 guards juntos, via um controller de teste isolado, nunca registrado no app real |
 | `TenantContextService` | Isolamento entre contextos concorrentes (duas "requisições" simultâneas nunca vazam `academiaId` uma pra outra) |
-| `TenantContextInterceptor` | Contexto sobrevive a um `await` interno no handler — o cenário exato que quebrava com `enterWith()` |
+| `TenantContextInterceptor` | Contexto sobrevive a um `await` interno no handler (o cenário exato que quebrava com `enterWith()`); cancelamento (`unsubscribe`) propaga para o handler interno |
 | `TokenService` | Geração/hash de tokens, unicidade, determinismo do hash |
 | `AuditService` | Grava corretamente e nunca propaga erro de escrita |
 | `ThrottlerGuard` | 429 real após o limite, via HTTP |
-| Extensão do Prisma | 6 cenários: sem contexto, `SYSTEM_ADMIN`, isolamento entre academias, `create` automático, `count()`, client "cru" intencionalmente sem filtro |
+| Extensão do Prisma | 10 cenários: sem contexto, `SYSTEM_ADMIN`, isolamento entre academias, `create`/`createMany` automáticos, `count()`, `findUnique`/`update`/`delete`/`upsert` nunca alcançando registro de outra academia, client "cru" intencionalmente sem filtro |
 | `auth.e2e-spec.ts` | Login (sucesso/falha/e-mail inexistente/validação/auditoria), `/me`, refresh (rotação/reuso derrubando todas as sessões), logout (idempotência), troca de senha (política/senha errada/sucesso) |
 
 ## 5. Riscos encontrados e corrigidos durante a implementação
@@ -98,6 +98,27 @@ Todos os 6 itens foram corrigidos e reverificados. O item 1 é o mais relevante:
 - Escopo respeitado à risca: nenhum módulo de negócio foi tocado; `RolesGuard`/`AcademiaGuard` foram construídos e testados exaustivamente mesmo sem um endpoint real para "pendurar" ainda — o uso em produção começa no Sprint 2, deixado explícito na documentação em vez de forçar um endpoint fora de escopo só para exercitá-los.
 - Zero atalhos: todo fluxo (login, refresh, logout, troca de senha) passa por auditoria, e todo teste roda contra Postgres real, nunca mockado no nível de integração.
 
+## 7.1. Revisão arquitetural pré-`v0.2.0`
+
+Antes de considerar a camada de autenticação congelada, foi feita uma segunda passada dedicada por todo o código do sprint (não só o que os testes já cobriam), procurando especificamente por segurança, acoplamento, duplicação, distribuição de responsabilidades, performance e riscos para os módulos de negócio que vêm a seguir. Achados reais, todos corrigidos e revalidados (build + lint + 56 testes unitários + 31 e2e + verificação manual completa contra Docker real):
+
+| # | Achado | Risco se não corrigido | Correção |
+|---|---|---|---|
+| 1 | A extensão de isolamento do Prisma não tratava `upsert` — nem o `where` nem o `create` eram filtrados por `academiaId` | **Real e confirmado por teste**: o branch de update do `upsert` conseguia achar e sobrescrever um registro de **outra** academia pelo id, ignorando o isolamento por completo | Tratamento dedicado para `upsert` na extensão (injeta `academiaId` no `where` e no `create`); `groupBy` também adicionado à lista de operações filtradas por `where` |
+| 2 | `TokenService.verifyAccessToken()` existia, era testado, mas nunca era chamado — `JwtAuthGuard` reimplementava a mesma verificação direto via `JwtService`/`ConfigService` | Duplicação real: duas implementações da mesma lógica podiam divergir silenciosamente (ex.: ao implementar rotação de chave, seria fácil atualizar uma e esquecer a outra) | Método morto removido do `TokenService` (e seu teste); `JwtAuthGuard` continua com sua própria verificação — única fonte da verdade agora |
+| 3 | `TenantContextInterceptor` não propagava `unsubscribe()` para a subscription interna do handler | Requisição cancelada/cliente lento desconectando não interrompe o handler em andamento no servidor — vazamento de recurso sob carga sustentada | `new Observable` agora retorna uma função de teardown que desinscreve a subscription interna; coberto por teste dedicado |
+| 4 | `TenantContextService.set()` (baseado em `enterWith()`) era código morto, nunca chamado em produção — mas o comentário da classe ainda dizia que era assim que o `JwtAuthGuard` populava o contexto, e havia um teste "provando" que funcionava | O teste testava um cenário diferente do bug real (await *dentro* da mesma função, não através de uma fronteira guard→continuação) — dava falsa confiança para alguém reintroduzir exatamente o bug do Achado #1 do Sprint 1 (`enterWith()` não propaga através de `await`) em um contexto novo (ex.: um job assíncrono, um handler de WebSocket) | `set()` removido; documentação da classe corrigida para apontar o `TenantContextInterceptor` como o único mecanismo válido |
+| 5 | `PrismaService.forTenant()` construía uma nova instância do client estendido a cada chamada, mesmo várias vezes dentro da mesma requisição | Alocação desnecessária repetida em todo request de negócio a partir do Sprint 2 (sem benefício — o filtro já é resolvido em tempo de query, não em tempo de construção do client) | Instância cacheada no `PrismaService`, construída uma única vez |
+
+**Verificado e confirmado correto** (nada mudou, mas valia a pena checar de verdade em vez de assumir):
+- `findUnique`/`update`/`delete` com `academiaId` mesclado no `where` junto de um identificador único funcionam exatamente como esperado — Prisma suporta "extended where unique" nesses casos. Sem essa verificação empírica, essa era a maior incerteza da extensão.
+- A ordem de execução dos guards globais é `ThrottlerGuard` → `JwtAuthGuard`: uma rajada de requisições sem token válido contra uma rota protegida é contada pelo rate limit normalmente (confirmado com 70 requisições reais contra o Docker de produção). Documentado em `docs/11-security.md` como um invariante a preservar.
+- A estratégia de revogar toda a família de sessões ao detectar reuso de refresh token (mesmo que o reuso seja de um token revogado por logout normal, não só por roubo) é o padrão correto e deliberado da indústria (mesma abordagem usada por Auth0 e recomendada pelo OWASP para rotação de refresh token) — não é um falso positivo a "suavizar".
+
+**Considerado e descartado** (avaliado, sem ganho técnico real o suficiente para justificar a mudança):
+- Duplicação de 2 linhas ("buscar `RefreshToken` pelo hash") entre `refresh()` e `logout()` em `AuthService` — extrair um helper trocaria 2 linhas duplicadas por uma indireção; não vale a pena.
+- `login()` não usa `$transaction` como `refresh()` ao criar o refresh token + atualizar `lastLoginAt` — inconsistência estilística menor; `lastLoginAt` é só informativo, sem risco de segurança se ficar dessincronizado por uma falha exatamente entre as duas escritas.
+
 ## 8. Melhorias futuras (não bloqueantes)
 
 1. Endpoints de gestão de sessão ("ver sessões ativas", "encerrar uma sessão específica") — o schema (`RefreshToken.ipAddress/userAgent/lastUsedAt`) já suporta, faltam só os endpoints.
@@ -109,10 +130,10 @@ Todos os 6 itens foram corrigidos e reverificados. O item 1 é o mais relevante:
 
 | Critério | Nota | Justificativa |
 |---|---|---|
-| **Arquitetura** | **9,5/10** | Isolamento por tenant com defesa em profundidade (JWT + TenantContext + extensão do Prisma), guards/decorators genéricos e reutilizáveis, escopo respeitado sem exceção. O bug do `enterWith()` foi pego e corrigido *antes* de virar código de produção — exatamente o que uma boa arquitetura de testes deve fazer. |
-| **Segurança** | **9,5/10** | Rotação de refresh token com detecção de reuso, revogação em cascata, rate limiting confirmado via 429 real, Helmet, timing-safe login, nenhum stack trace vazado — tudo testado e2e, não só implementado. Meio ponto a menos pelas vulnerabilidades transitivas conhecidas e aceitas (item externo, não deste sprint). |
-| **Cobertura de testes** | **10/10** | 84 testes (57 unit + 27 e2e), incluindo os cenários mais sensíveis (reuso de token, isolamento entre tenants, rate limit real) — sempre contra Postgres real, confirmados três vezes de forma independente (local, simulação de CI, GitHub Actions real). |
-| **Nota geral** | **9,5/10** | Sprint entregue dentro do escopo exato pedido, com um achado arquitetural genuíno corrigido durante o processo (não depois), e validação de ponta a ponta em CI real — não apenas "parece que funciona". |
+| **Arquitetura** | **9,5/10** | Isolamento por tenant com defesa em profundidade (JWT + TenantContext + extensão do Prisma), guards/decorators genéricos e reutilizáveis, escopo respeitado sem exceção. A revisão pré-`v0.2.0` (seção 7.1) removeu código morto que documentava um padrão perigoso (`set()`/`enterWith()`) e uma duplicação real de verificação de token — arquitetura mais enxuta depois da revisão do que antes. |
+| **Segurança** | **9/10** | Rotação de refresh token com detecção de reuso, revogação em cascata, rate limiting confirmado via 429 real (inclusive contra requisições rejeitadas, não só bem-sucedidas), Helmet, timing-safe login, nenhum stack trace vazado. Um ponto a menos: a revisão pré-`v0.2.0` encontrou um vazamento cross-tenant real (e confirmado por teste) no `upsert` da extensão do Prisma — corrigido antes de qualquer módulo de negócio depender dele, mas é exatamente o tipo de lacuna que uma primeira passada não pegou sozinha. |
+| **Cobertura de testes** | **10/10** | 87 testes (56 unit + 31 e2e), incluindo os cenários mais sensíveis (reuso de token, isolamento entre tenants em `findUnique`/`update`/`delete`/`upsert`, rate limit real, cancelamento de requisição) — sempre contra Postgres real, confirmados de forma independente em quatro momentos (local, simulação de CI, GitHub Actions real, e novamente após a revisão arquitetural). |
+| **Nota geral** | **9,5/10** | Sprint entregue dentro do escopo exato pedido, com dois achados arquiteturais genuínos corrigidos durante o processo — um na implementação original (`enterWith()`), outro na revisão pré-congelamento (`upsert` sem isolamento) — ambos pegos por teste, não por inspeção visual, e ambos corrigidos antes de qualquer código de negócio depender da peça com defeito. |
 
 ---
 

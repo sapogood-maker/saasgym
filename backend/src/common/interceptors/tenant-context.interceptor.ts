@@ -1,5 +1,5 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { TenantContextService } from '../context/tenant-context.service';
 
 /// Popula o TenantContext (AsyncLocalStorage) para toda a execução do
@@ -24,9 +24,17 @@ export class TenantContextInterceptor implements NestInterceptor {
     }
 
     return new Observable((subscriber) => {
+      let innerSubscription: Subscription | undefined;
+
       this.tenantContext.run(user, () => {
-        next.handle().subscribe(subscriber);
+        innerSubscription = next.handle().subscribe(subscriber);
       });
+
+      // Propaga o cancelamento: se a requisição for abortada (cliente
+      // desconectou, timeout), a subscription interna também é encerrada —
+      // sem isso, a query/handler em andamento continuaria rodando até o
+      // fim sozinho, mesmo sem ninguém mais esperando o resultado.
+      return () => innerSubscription?.unsubscribe();
     });
   }
 }

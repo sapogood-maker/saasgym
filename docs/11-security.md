@@ -15,6 +15,8 @@ Implementado no Sprint 1. Complementa `docs/01-arquitetura.md` (visão geral) e 
 
 Ambos os limites sobem para 1000/min quando `NODE_ENV=test` — sem isso, os próprios testes e2e (que fazem dezenas de logins em segundos) tropeçariam no limite pensado para tráfego real. Achado real durante a implementação: o primeiro rate limit de login quebrou a suíte e2e inteira até essa correção.
 
+**Ordem de execução importa aqui**: `ThrottlerGuard` é registrado em `AppModule` (módulo raiz) e `JwtAuthGuard` dentro de `AuthModule` (importado depois). Verificado manualmente contra o Docker de produção: `ThrottlerGuard` roda **antes** de `JwtAuthGuard` — uma rajada de requisições sem token válido contra uma rota protegida é contada pelo rate limit e recebe `429` normalmente, não só `401` infinito. Se essa ordem for invertida no futuro (ex.: registrando `JwtAuthGuard` em um módulo importado antes do `ThrottlerModule`), requisições rejeitadas por falta de autenticação passariam a não ser contadas — abrindo uma forma de martelar endpoints protegidos sem nunca ser limitado. Ao adicionar novos `APP_GUARD` globais, preserve o `ThrottlerGuard` como o primeiro da cadeia.
+
 ## Tratamento de erros
 
 `AllExceptionsFilter` (`backend/src/common/filters/all-exceptions.filter.ts`), global via `APP_FILTER`. Formato consistente:

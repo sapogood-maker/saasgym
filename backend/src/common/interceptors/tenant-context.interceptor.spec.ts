@@ -1,7 +1,15 @@
-import { Controller, Get, INestApplication, UseInterceptors } from '@nestjs/common';
+import {
+  CallHandler,
+  Controller,
+  ExecutionContext,
+  Get,
+  INestApplication,
+  UseInterceptors,
+} from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Role } from '@prisma/client';
+import { Observable } from 'rxjs';
 import request from 'supertest';
 import { TenantContextInterceptor } from './tenant-context.interceptor';
 import { TenantContextService } from '../context/tenant-context.service';
@@ -73,5 +81,33 @@ describe('TenantContextInterceptor (integração via HTTP real)', () => {
 
     expect(a.body).toEqual({ academiaId: 'academia-1' });
     expect(b.body).toEqual({ academiaId: 'academia-1' });
+  });
+
+  it('propaga o unsubscribe: cancelar a requisição também cancela o handler interno', () => {
+    let innerUnsubscribed = false;
+
+    const fakeCallHandler: CallHandler = {
+      handle: () =>
+        new Observable(() => {
+          return () => {
+            innerUnsubscribed = true;
+          };
+        }),
+    };
+
+    const fakeContext = {
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { userId: 'u', academiaId: 'academia-1', role: Role.ACADEMIA_ADMIN },
+        }),
+      }),
+    } as unknown as ExecutionContext;
+
+    const interceptor = new TenantContextInterceptor(new TenantContextService());
+    const subscription = interceptor.intercept(fakeContext, fakeCallHandler).subscribe();
+
+    expect(innerUnsubscribed).toBe(false);
+    subscription.unsubscribe();
+    expect(innerUnsubscribed).toBe(true);
   });
 });

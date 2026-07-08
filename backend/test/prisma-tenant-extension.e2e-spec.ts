@@ -127,6 +127,106 @@ describe('Prisma tenant isolation extension (e2e)', () => {
     expect(countB).toBeGreaterThanOrEqual(1);
   });
 
+  it('findUnique por id não vaza registro de outra academia (nem quebra o Prisma)', async () => {
+    const userB = await prisma.user.findFirstOrThrow({ where: { academiaId: academiaB.id } });
+
+    await tenantContext.run(
+      { userId: 'u-a', academiaId: academiaA.id, role: Role.ACADEMIA_ADMIN },
+      async () => {
+        const found = await prisma.forTenant().user.findUnique({ where: { id: userB.id } });
+        expect(found).toBeNull();
+      },
+    );
+  });
+
+  it('update por id só afeta registro da própria academia', async () => {
+    const userA = await prisma.user.findFirstOrThrow({ where: { academiaId: academiaA.id } });
+    const userB = await prisma.user.findFirstOrThrow({ where: { academiaId: academiaB.id } });
+
+    await tenantContext.run(
+      { userId: 'u-a', academiaId: academiaA.id, role: Role.ACADEMIA_ADMIN },
+      async () => {
+        const updated = await prisma
+          .forTenant()
+          .user.update({ where: { id: userA.id }, data: { nome: 'Atualizado via extension' } });
+        expect(updated.nome).toBe('Atualizado via extension');
+
+        await expect(
+          prisma.forTenant().user.update({ where: { id: userB.id }, data: { nome: 'Hackeado' } }),
+        ).rejects.toThrow();
+      },
+    );
+
+    const userBAfter = await prisma.user.findUniqueOrThrow({ where: { id: userB.id } });
+    expect(userBAfter.nome).not.toBe('Hackeado');
+  });
+
+  it('delete por id só afeta registro da própria academia', async () => {
+    const toDelete = await prisma.user.create({
+      data: {
+        nome: 'Vai ser deletado',
+        email: `delete-alvo-${Date.now()}@example.com`,
+        senhaHash: 'x',
+        role: Role.PROFESSOR,
+        academiaId: academiaB.id,
+      },
+    });
+
+    await tenantContext.run(
+      { userId: 'u-a', academiaId: academiaA.id, role: Role.ACADEMIA_ADMIN },
+      async () => {
+        await expect(
+          prisma.forTenant().user.delete({ where: { id: toDelete.id } }),
+        ).rejects.toThrow();
+      },
+    );
+
+    const stillExists = await prisma.user.findUnique({ where: { id: toDelete.id } });
+    expect(stillExists).not.toBeNull();
+  });
+
+  it('upsert respeita o isolamento (branch update E branch create)', async () => {
+    const userA = await prisma.user.findFirstOrThrow({ where: { academiaId: academiaA.id } });
+    const userB = await prisma.user.findFirstOrThrow({ where: { academiaId: academiaB.id } });
+
+    await tenantContext.run(
+      { userId: 'u-a', academiaId: academiaA.id, role: Role.ACADEMIA_ADMIN },
+      async () => {
+        // branch update: registro é da própria academia -> deve atualizar
+        const updated = await prisma.forTenant().user.upsert({
+          where: { id: userA.id },
+          update: { nome: 'Atualizado via upsert' },
+          create: {
+            nome: 'Não deveria criar',
+            email: `nao-deveria-${Date.now()}@example.com`,
+            senhaHash: 'x',
+            role: Role.PROFESSOR,
+          },
+        });
+        expect(updated.id).toBe(userA.id);
+        expect(updated.nome).toBe('Atualizado via upsert');
+
+        // branch update: registro é de OUTRA academia -> não pode achar por
+        // esse id sob o filtro, então cai no branch create (comportamento
+        // esperado do Prisma) — e o create precisa injetar academiaId.
+        const result = await prisma.forTenant().user.upsert({
+          where: { id: userB.id },
+          update: { nome: 'Não deveria tocar em B' },
+          create: {
+            nome: 'Criado via upsert (fallback)',
+            email: `upsert-fallback-${Date.now()}@example.com`,
+            senhaHash: 'x',
+            role: Role.PROFESSOR,
+          },
+        });
+        expect(result.academiaId).toBe(academiaA.id);
+      },
+    );
+
+    const userBAfter = await prisma.user.findUniqueOrThrow({ where: { id: userB.id } });
+    expect(userBAfter.nome).not.toBe('Não deveria tocar em B');
+  });
+
   it('client "cru" (this.prisma, sem forTenant) nunca filtra — uso intencional para login/seed/gestão de tenants', async () => {
     await tenantContext.run(
       { userId: 'u-a', academiaId: academiaA.id, role: Role.ACADEMIA_ADMIN },

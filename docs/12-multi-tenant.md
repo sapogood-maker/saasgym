@@ -45,7 +45,11 @@ Comportamento por perfil:
 
 Hoje só `User` está na lista de models tenant-scoped (`TENANT_SCOPED_MODELS` no arquivo da extensão). Cada nova entidade de negócio com `academiaId` (Sprint 2+) entra nessa lista — nenhuma mudança é necessária nos services que já usam `forTenant()`.
 
-Testado em `test/prisma-tenant-extension.e2e-spec.ts`: sem contexto não filtra, `SYSTEM_ADMIN` vê tudo, uma academia nunca vê dados de outra mesmo pedindo explicitamente, `create` injeta `academiaId` sozinho, `count()` respeita o isolamento.
+A instância retornada por `forTenant()` é construída uma única vez por `PrismaService` e cacheada — não a cada chamada. É seguro: o filtro é resolvido lendo o `TenantContext` dentro do `$allOperations` da extensão, em tempo de query, não em tempo de construção do client.
+
+`upsert` tem forma própria (`where` + `create` + `update` juntos) e não é coberto pelos branches de `where`/`create` genéricos — tem tratamento dedicado na extensão. Sem ele, o branch de update do `upsert` acharia (e sobrescreveria) um registro de outra academia pelo id, ignorando o isolamento por completo — bug real encontrado e corrigido durante a revisão pré-`v0.2.0` (ver `SPRINT1_REPORT.md`).
+
+Testado em `test/prisma-tenant-extension.e2e-spec.ts`: sem contexto não filtra, `SYSTEM_ADMIN` vê tudo, uma academia nunca vê dados de outra mesmo pedindo explicitamente, `create`/`createMany` injetam `academiaId` sozinhos, `count()` respeita o isolamento, `findUnique`/`update`/`delete`/`upsert` por id nunca alcançam (nem quebram tentando alcançar) um registro de outra academia.
 
 ## Guards de tenant/perfil
 

@@ -66,14 +66,4 @@ describe('TenantContextService', () => {
     expect(seenA).toEqual(['academia-a', 'academia-a']);
     expect(seenB).toEqual(['academia-b', 'academia-b']);
   });
-
-  it('set() aplica o contexto para o restante da execução assíncrona atual (enterWith)', async () => {
-    async function simulateRequest() {
-      service.set(userA);
-      await Promise.resolve();
-      return service.getAcademiaId();
-    }
-
-    expect(await simulateRequest()).toBe('academia-a');
-  });
 });

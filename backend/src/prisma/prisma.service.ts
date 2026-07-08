@@ -13,6 +13,8 @@ import { createTenantExtension } from '../common/prisma/prisma-tenant.extension'
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
+  private tenantScopedClient?: ReturnType<PrismaService['buildTenantScopedClient']>;
+
   constructor(private readonly tenantContext: TenantContextService) {
     super();
   }
@@ -21,7 +23,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   /// TenantContext) — use em qualquer service de negócio tenant-scoped.
   /// Fluxos inerentemente cross-tenant (login por e-mail, seed, gestão de
   /// academias pelo SYSTEM_ADMIN) continuam usando `this` diretamente.
+  ///
+  /// A instância estendida é construída uma única vez e reaproveitada: o
+  /// filtro por tenant é resolvido a cada query (lendo o TenantContext no
+  /// momento da chamada, dentro do $allOperations da extensão), não na
+  /// criação do client — recriar a cada chamada de forTenant() só somaria
+  /// alocação sem nenhum ganho, e este método tende a ser chamado várias
+  /// vezes por requisição nos módulos de negócio (Sprint 2+).
   forTenant() {
+    this.tenantScopedClient ??= this.buildTenantScopedClient();
+    return this.tenantScopedClient;
+  }
+
+  private buildTenantScopedClient() {
     return this.$extends(createTenantExtension(this.tenantContext));
   }
 
