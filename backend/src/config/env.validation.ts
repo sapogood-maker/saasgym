@@ -47,7 +47,8 @@ export function validateEnv(config: Record<string, unknown>) {
   const errors = validateSync(validatedConfig, { skipMissingProperties: false });
 
   if (errors.length > 0) {
-    throw new Error(`Configuração de ambiente inválida: ${errors.toString()}`);
+    const messages = errors.flatMap((error) => Object.values(error.constraints ?? {})).join('; ');
+    throw new Error(`Configuração de ambiente inválida: ${messages}`);
   }
 
   return validatedConfig;

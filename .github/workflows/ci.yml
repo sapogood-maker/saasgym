@@ -39,6 +39,11 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+        working-directory: admin_web
+      - run: flutter test
+        working-directory: student_web
+      - run: flutter test
+        working-directory: packages/shared_core
       - run: flutter build web --release
         working-directory: admin_web
       - run: flutter build web --release
