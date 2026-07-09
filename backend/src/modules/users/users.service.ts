@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Arquivo, AuditAction, User } from '@prisma/client';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
+import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { FileUploadService, UploadedFileInput } from '../../storage/file-upload.service';
@@ -29,7 +30,11 @@ export class UsersService {
     return this.toResponse(user);
   }
 
-  async updateMe(userId: string, dto: UpdateUserProfileDto): Promise<UserProfileResponseDto> {
+  async updateMe(
+    userId: string,
+    dto: UpdateUserProfileDto,
+    meta: RequestMetadata = {},
+  ): Promise<UserProfileResponseDto> {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { nome: dto.nome },
@@ -41,12 +46,17 @@ export class UsersService {
       userId,
       academiaId: user.academiaId,
       metadata: { camposAlterados: Object.keys(dto) },
+      ...meta,
     });
 
     return this.toResponse(user);
   }
 
-  async uploadFoto(userId: string, file: UploadedFileInput): Promise<UserProfileResponseDto> {
+  async uploadFoto(
+    userId: string,
+    file: UploadedFileInput,
+    meta: RequestMetadata = {},
+  ): Promise<UserProfileResponseDto> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: { fotoArquivo: true },
@@ -69,6 +79,7 @@ export class UsersService {
       userId,
       academiaId: user.academiaId,
       metadata: { entidade: 'User' },
+      ...meta,
     });
 
     return this.toResponse(atualizado);

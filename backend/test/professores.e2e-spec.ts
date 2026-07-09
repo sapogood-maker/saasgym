@@ -88,6 +88,7 @@ describe('Professores (e2e)', () => {
       where: { action: 'PROFESSOR_CREATED', academiaId: academia.id },
     });
     expect(auditEntry).not.toBeNull();
+    expect(auditEntry?.ipAddress).toBeTruthy();
 
     const detalhe = await request(app.getHttpServer())
       .get(`/api/professores/${criado.body.id}`)

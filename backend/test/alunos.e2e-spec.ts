@@ -126,6 +126,7 @@ describe('Alunos (e2e)', () => {
         where: { action: 'ALUNO_CREATED', academiaId: academia.id },
       });
       expect(auditEntry).not.toBeNull();
+      expect(auditEntry?.ipAddress).toBeTruthy();
 
       const detalhe = await request(app.getHttpServer())
         .get(`/api/alunos/${criado.body.id}`)

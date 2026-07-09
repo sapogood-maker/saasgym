@@ -11,12 +11,14 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import type { Request } from 'express';
 import { CreateProfessorDto } from './dto/create-professor.dto';
 import { ListProfessoresQueryDto } from './dto/list-professores-query.dto';
 import {
@@ -30,6 +32,7 @@ import { AcademiaGuard } from '../../common/guards/academia.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ImageFileInterceptor } from '../../common/upload/image-file-interceptor';
+import { requestMetadata } from '../../common/utils/request-metadata';
 
 /// Mesmo padrão de permissões de AlunosController (ver lá).
 @ApiTags('professores')
@@ -42,8 +45,8 @@ export class ProfessoresController {
   @Post()
   @Roles(Role.ACADEMIA_ADMIN, Role.RECEPCIONISTA)
   @ApiOperation({ summary: 'Cadastra um professor' })
-  create(@Body() dto: CreateProfessorDto): Promise<ProfessorResponseDto> {
-    return this.service.create(dto);
+  create(@Body() dto: CreateProfessorDto, @Req() req: Request): Promise<ProfessorResponseDto> {
+    return this.service.create(dto, requestMetadata(req));
   }
 
   @Get()
@@ -68,8 +71,9 @@ export class ProfessoresController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProfessorDto,
+    @Req() req: Request,
   ): Promise<ProfessorResponseDto> {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, requestMetadata(req));
   }
 
   @Patch(':id/status')
@@ -78,16 +82,17 @@ export class ProfessoresController {
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProfessorStatusDto,
+    @Req() req: Request,
   ): Promise<ProfessorResponseDto> {
-    return this.service.updateStatus(id, dto);
+    return this.service.updateStatus(id, dto, requestMetadata(req));
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(Role.ACADEMIA_ADMIN, Role.RECEPCIONISTA)
   @ApiOperation({ summary: 'Remove um professor (soft delete — nunca apagado fisicamente)' })
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    await this.service.remove(id);
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request): Promise<void> {
+    await this.service.remove(id, requestMetadata(req));
   }
 
   @Post(':id/foto')
@@ -101,10 +106,11 @@ export class ProfessoresController {
   async uploadFoto(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: Request,
   ): Promise<ProfessorResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo enviado');
     }
-    return this.service.uploadFoto(id, file);
+    return this.service.uploadFoto(id, file, requestMetadata(req));
   }
 }

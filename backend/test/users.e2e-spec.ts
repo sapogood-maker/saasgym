@@ -69,6 +69,7 @@ describe('Perfil do usuário (e2e)', () => {
       where: { action: 'USER_PROFILE_UPDATED' },
     });
     expect(auditEntry).not.toBeNull();
+    expect(auditEntry?.ipAddress).toBeTruthy();
   });
 
   it('não permite alterar role/permissões (campo nem existe no DTO — extra é rejeitado)', async () => {

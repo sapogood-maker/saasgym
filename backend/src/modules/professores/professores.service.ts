@@ -9,6 +9,7 @@ import {
 import { UpdateProfessorDto } from './dto/update-professor.dto';
 import { UpdateProfessorStatusDto } from './dto/update-professor-status.dto';
 import { TenantContextService } from '../../common/context/tenant-context.service';
+import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { FileUploadService, UploadedFileInput } from '../../storage/file-upload.service';
@@ -28,7 +29,7 @@ export class ProfessoresService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async create(dto: CreateProfessorDto): Promise<ProfessorResponseDto> {
+  async create(dto: CreateProfessorDto, meta: RequestMetadata = {}): Promise<ProfessorResponseDto> {
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
     const professor = await this.criarOuRelancar(() =>
@@ -43,6 +44,7 @@ export class ProfessoresService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { professorId: professor.id },
+      ...meta,
     });
 
     return this.toResponse(professor);
@@ -88,7 +90,11 @@ export class ProfessoresService {
     return this.toResponse(await this.findOrThrow(id));
   }
 
-  async update(id: string, dto: UpdateProfessorDto): Promise<ProfessorResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateProfessorDto,
+    meta: RequestMetadata = {},
+  ): Promise<ProfessorResponseDto> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
@@ -105,12 +111,17 @@ export class ProfessoresService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { professorId: id, camposAlterados: Object.keys(dto) },
+      ...meta,
     });
 
     return this.toResponse(professor);
   }
 
-  async updateStatus(id: string, dto: UpdateProfessorStatusDto): Promise<ProfessorResponseDto> {
+  async updateStatus(
+    id: string,
+    dto: UpdateProfessorStatusDto,
+    meta: RequestMetadata = {},
+  ): Promise<ProfessorResponseDto> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
@@ -125,12 +136,13 @@ export class ProfessoresService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { professorId: id, statusNovo: dto.status, motivo: dto.motivo },
+      ...meta,
     });
 
     return this.toResponse(professor);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, meta: RequestMetadata = {}): Promise<void> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
@@ -144,10 +156,15 @@ export class ProfessoresService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { professorId: id },
+      ...meta,
     });
   }
 
-  async uploadFoto(id: string, file: UploadedFileInput): Promise<ProfessorResponseDto> {
+  async uploadFoto(
+    id: string,
+    file: UploadedFileInput,
+    meta: RequestMetadata = {},
+  ): Promise<ProfessorResponseDto> {
     const professor = await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
@@ -168,6 +185,7 @@ export class ProfessoresService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { entidade: 'Professor', professorId: id },
+      ...meta,
     });
 
     return this.toResponse(atualizado);

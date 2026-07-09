@@ -11,12 +11,14 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import type { Request } from 'express';
 import { AlunosService } from './alunos.service';
 import { AlunoResponseDto, PaginatedAlunosResponseDto } from './dto/aluno-response.dto';
 import { CreateAlunoDto } from './dto/create-aluno.dto';
@@ -27,6 +29,7 @@ import { AcademiaGuard } from '../../common/guards/academia.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ImageFileInterceptor } from '../../common/upload/image-file-interceptor';
+import { requestMetadata } from '../../common/utils/request-metadata';
 
 /// Tenant-scoped: exige AcademiaGuard (bloqueia SYSTEM_ADMIN) + RolesGuard.
 /// Escrita restrita a ACADEMIA_ADMIN/RECEPCIONISTA; leitura também aberta a
@@ -41,8 +44,8 @@ export class AlunosController {
   @Post()
   @Roles(Role.ACADEMIA_ADMIN, Role.RECEPCIONISTA)
   @ApiOperation({ summary: 'Cadastra um aluno' })
-  create(@Body() dto: CreateAlunoDto): Promise<AlunoResponseDto> {
-    return this.service.create(dto);
+  create(@Body() dto: CreateAlunoDto, @Req() req: Request): Promise<AlunoResponseDto> {
+    return this.service.create(dto, requestMetadata(req));
   }
 
   @Get()
@@ -67,8 +70,9 @@ export class AlunosController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAlunoDto,
+    @Req() req: Request,
   ): Promise<AlunoResponseDto> {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, requestMetadata(req));
   }
 
   @Patch(':id/status')
@@ -77,16 +81,17 @@ export class AlunosController {
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAlunoStatusDto,
+    @Req() req: Request,
   ): Promise<AlunoResponseDto> {
-    return this.service.updateStatus(id, dto);
+    return this.service.updateStatus(id, dto, requestMetadata(req));
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles(Role.ACADEMIA_ADMIN, Role.RECEPCIONISTA)
   @ApiOperation({ summary: 'Remove um aluno (soft delete — nunca apagado fisicamente)' })
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    await this.service.remove(id);
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request): Promise<void> {
+    await this.service.remove(id, requestMetadata(req));
   }
 
   @Post(':id/foto')
@@ -100,10 +105,11 @@ export class AlunosController {
   async uploadFoto(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: Request,
   ): Promise<AlunoResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo enviado');
     }
-    return this.service.uploadFoto(id, file);
+    return this.service.uploadFoto(id, file, requestMetadata(req));
   }
 }

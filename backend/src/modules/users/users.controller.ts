@@ -5,16 +5,19 @@ import {
   Get,
   Patch,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 import { UsersService } from './users.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 import { ImageFileInterceptor } from '../../common/upload/image-file-interceptor';
+import { requestMetadata } from '../../common/utils/request-metadata';
 
 /// Perfil próprio — qualquer usuário autenticado, incluindo SYSTEM_ADMIN
 /// (sem AcademiaGuard, mesmo padrão de /auth/me). Trocar a própria senha
@@ -36,8 +39,9 @@ export class UsersController {
   updateMe(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateUserProfileDto,
+    @Req() req: Request,
   ): Promise<UserProfileResponseDto> {
-    return this.service.updateMe(user.userId, dto);
+    return this.service.updateMe(user.userId, dto, requestMetadata(req));
   }
 
   @Post('me/foto')
@@ -50,10 +54,11 @@ export class UsersController {
   async uploadFoto(
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: Request,
   ): Promise<UserProfileResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo enviado');
     }
-    return this.service.uploadFoto(user.userId, file);
+    return this.service.uploadFoto(user.userId, file, requestMetadata(req));
   }
 }
