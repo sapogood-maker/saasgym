@@ -35,3 +35,7 @@ Ver `docs/10-auth.md` para os endpoints (`/auth/login`, `/auth/refresh`, `/auth/
 ## Administração do SaaS
 
 Endpoints em `/admin/*` — 100% restritos a `SYSTEM_ADMIN` (`SystemAdminGuard`), nunca acessíveis a usuários de academia. Ver `docs/13-admin-saas.md` para o módulo completo (academias, planos SaaS, dashboard).
+
+## Alunos, Professores, Dashboard da Academia e Perfil
+
+Endpoints `/alunos`, `/professores`, `/dashboard` (`AcademiaGuard` + `RolesGuard`, distinto de `/admin/dashboard`) e `/users/me` (sem `AcademiaGuard` — funciona também para `SYSTEM_ADMIN`, mesmo padrão de `/auth/me`). Primeiros endpoints de negócio acessíveis a usuários de academia. Ver `docs/14-alunos-professores.md` para o módulo completo.

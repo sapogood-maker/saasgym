@@ -46,4 +46,4 @@ Ver [`docs/08-roadmap.md`](docs/08-roadmap.md).
 
 ## Versões
 
-Ver [`CHANGELOG.md`](CHANGELOG.md) — release atual: `v0.2.0`.
+Ver [`CHANGELOG.md`](CHANGELOG.md) — release atual: `v0.3.0`.

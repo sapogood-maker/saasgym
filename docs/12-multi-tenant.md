@@ -43,7 +43,7 @@ Comportamento por perfil:
 
 `this.prisma` (sem `.forTenant()`) continua sem filtro nenhum — uso **intencional** para os poucos fluxos genuinamente cross-tenant: login por e-mail (que precisa achar o usuário antes de saber a qual academia ele pertence), seed, e futuros endpoints de gestão de academias pelo `SYSTEM_ADMIN`.
 
-Hoje só `User` está na lista de models tenant-scoped (`TENANT_SCOPED_MODELS` no arquivo da extensão). Cada nova entidade de negócio com `academiaId` (Sprint 2+) entra nessa lista — nenhuma mudança é necessária nos services que já usam `forTenant()`.
+`TENANT_SCOPED_MODELS` (no arquivo da extensão): `User`, `Aluno`, `Professor` (os dois últimos entraram no Sprint 3 — a única mudança feita na extensão desde que ela foi congelada no Sprint 1, exatamente prevista pelo comentário que já estava lá). Cada nova entidade de negócio com `academiaId` entra nessa lista — nenhuma mudança é necessária nos services que já usam `forTenant()`.
 
 A instância retornada por `forTenant()` é construída uma única vez por `PrismaService` e cacheada — não a cada chamada. É seguro: o filtro é resolvido lendo o `TenantContext` dentro do `$allOperations` da extensão, em tempo de query, não em tempo de construção do client.
 

@@ -2,25 +2,22 @@
 
 PostgreSQL + Prisma ORM. Schema em `backend/prisma/schema.prisma`, migrations em `backend/prisma/migrations/`.
 
-## Implementado (Sprints 0-2)
+## Implementado (Sprints 0-3)
 
-`Academia` (tenant), `User` (identidade de login), `RefreshToken`, `AuditLog`, `PlanoSaas`, `AcademiaConfiguracao`, `Arquivo`. Ver `backend/prisma/schema.prisma` para os campos exatos.
+`Academia` (tenant), `User` (identidade de login), `RefreshToken`, `AuditLog`, `PlanoSaas`, `AcademiaConfiguracao`, `Arquivo`, `Aluno`, `Professor`. Ver `backend/prisma/schema.prisma` para os campos exatos.
 
 - `Academia.status`: `TRIAL | ATIVA | SUSPENSA | BLOQUEADA | CANCELADA` (Sprint 2 — os três últimos bloqueiam login/refresh, ver `docs/13-admin-saas.md`). `Academia.dominio` (subdomínio futuro, sem uso ainda) e `Academia.trialExpiresAt` também são do Sprint 2. `Academia.planoSaasId` é obrigatório — toda academia referencia um `PlanoSaas`.
-- `User.academiaId` é **nulo apenas** para `role = SYSTEM_ADMIN`. `User.passwordChangedAt` (Sprint 1) registra a última troca de senha.
+- `User.academiaId` é **nulo apenas** para `role = SYSTEM_ADMIN`. `User.passwordChangedAt` (Sprint 1) registra a última troca de senha. `User.fotoArquivoId` (Sprint 3) — avatar do próprio usuário, distinto da foto de `Aluno`/`Professor` (um `ACADEMIA_ADMIN` não é necessariamente um `Professor` cadastrado).
 - `RefreshToken` guarda o **hash** do token (SHA-256, nunca o token em texto puro), com `revokedAt`/`replacedBy` para rotação e revogação, e `ipAddress`/`userAgent`/`lastUsedAt` (Sprint 1) — cada linha é, na prática, uma sessão (ver `docs/10-auth.md`).
-- `AuditLog` (Sprint 1, +6 ações no Sprint 2) — trilha de auditoria (`AuditAction`: eventos de autenticação do Sprint 1 + `ACADEMIA_CREATED`, `ACADEMIA_UPDATED`, `ACADEMIA_STATUS_CHANGED`, `ACADEMIA_CONFIGURACAO_UPDATED`, `PLANO_SAAS_CREATED`, `PLANO_SAAS_UPDATED` do Sprint 2), sem FK obrigatória para `User` (login falho pode não corresponder a nenhum usuário real — usa `identifier` para guardar o e-mail tentado).
+- `AuditLog` (Sprint 1, +6 ações no Sprint 2, +11 ações no Sprint 3) — trilha de auditoria (`AuditAction`: eventos de autenticação do Sprint 1; `ACADEMIA_CREATED`, `ACADEMIA_UPDATED`, `ACADEMIA_STATUS_CHANGED`, `ACADEMIA_CONFIGURACAO_UPDATED`, `PLANO_SAAS_CREATED`, `PLANO_SAAS_UPDATED` do Sprint 2; `ALUNO_*`, `PROFESSOR_*`, `USER_PROFILE_UPDATED`, `FOTO_UPLOADED` do Sprint 3), sem FK obrigatória para `User` (login falho pode não corresponder a nenhum usuário real — usa `identifier` para guardar o e-mail tentado).
 - `PlanoSaas` (Sprint 2) — catálogo comercial do SaaS (Free/Trial/Basic/Professional/Enterprise), não tenant-scoped. Campos `limite*` nullable (`null` = ilimitado), sem enforcement ainda. Nome deliberadamente distinto do `Plano` de negócio planejado abaixo, para nunca colidir.
 - `AcademiaConfiguracao` (Sprint 2) — branding 1:1 com `Academia` (separado do cadastro administrativo por ser um tipo de dado diferente).
 - `Arquivo` (Sprint 2) — metadados de qualquer upload via `StorageProvider` (nome original, nome físico em UUID, caminho, mime type, tamanho, provider). Ponto único reaproveitável por qualquer módulo futuro com upload.
+- `Aluno`/`Professor` (Sprint 3, tenant-scoped) — cadastro administrativo (sem login próprio ainda). `@@unique([academiaId, cpf])`: CPF normalizado (só dígitos) e único dentro da academia, não globalmente. `deletedAt` (soft delete, filtrado no service, não na extensão do Prisma). `fotoArquivoId` → `Arquivo`. Ver `docs/14-alunos-professores.md`.
 
 ## Modelagem planejada
 
 Entidades marcadas com 🏢 têm `academiaId` obrigatório. As demais são globais/sistema. Sequência de sprints em `docs/08-roadmap.md` (não fixada aqui para não duplicar/desatualizar).
-
-**Pessoas** 🏢
-- `Aluno` — foto, nome, CPF, telefone, WhatsApp, e-mail, nascimento, endereço, observações, status; `userId` opcional (1:1) para login no portal.
-- `Professor` — cadastro completo; `userId` opcional (1:1).
 
 **Planos e Modalidades** 🏢
 - `Plano` — plano de mensalidade que a academia vende ao aluno (mensal/trimestral/semestral/anual/personalizado), valor, duração, quantidade de aulas, dias permitidos, limite de reposições. **Não confundir com `PlanoSaas`** (já implementado, Sprint 2) — este é o plano comercial da própria academia para seus alunos, tenant-scoped.
