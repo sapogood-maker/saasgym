@@ -61,9 +61,13 @@ export class AlunosService {
       where.status = query.status;
     }
     if (query.search) {
+      // CPF é armazenado só com dígitos (NormalizeCPF) — sem isso, buscar
+      // com a pontuação que o usuário digitou ("111.444.777-35") nunca
+      // bateria com o valor salvo.
+      const buscaSoDigitos = query.search.replace(/\D/g, '');
       where.OR = [
         { nome: { contains: query.search, mode: 'insensitive' } },
-        { cpf: { contains: query.search } },
+        { cpf: { contains: buscaSoDigitos || query.search } },
         { telefone: { contains: query.search } },
       ];
     }

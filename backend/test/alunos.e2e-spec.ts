@@ -214,6 +214,38 @@ describe('Alunos (e2e)', () => {
         .expect(409);
     });
 
+    it('CPF é normalizado (sem pontuação) e a unicidade não pode ser burlada trocando a máscara', async () => {
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia CPF Normalizado E2E',
+      });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+
+      const criado = await request(app.getHttpServer())
+        .post('/api/alunos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          nome: 'Aluno CPF Mascarado',
+          cpf: CPF_VALIDO_1, // '111.444.777-35'
+          dataNascimento: '2000-01-01',
+          sexo: 'MASCULINO',
+          telefone: '11999999999',
+        })
+        .expect(201);
+      expect(criado.body.cpf).toBe('11144477735');
+
+      await request(app.getHttpServer())
+        .post('/api/alunos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          nome: 'Outro Aluno',
+          cpf: '11144477735', // mesmo CPF, sem máscara
+          dataNascimento: '2000-01-01',
+          sexo: 'MASCULINO',
+          telefone: '11999999999',
+        })
+        .expect(409);
+    });
+
     it('mesmo CPF em academias diferentes é permitido', async () => {
       const academiaA = await createAcademiaFixture(prisma, {
         nome: 'Academia CPF Repetido A E2E',
@@ -332,6 +364,24 @@ describe('Alunos (e2e)', () => {
       expect(porTelefone.body.items.some((a: { nome: string }) => a.nome.includes('Zezinho'))).toBe(
         true,
       );
+
+      // CPF cadastrado com máscara ('111.444.777-35') — a pesquisa precisa
+      // achar tanto digitando só números quanto digitando com a máscara.
+      const porCpfSemMascara = await request(app.getHttpServer())
+        .get('/api/alunos?search=11144477735')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(
+        porCpfSemMascara.body.items.some((a: { nome: string }) => a.nome.includes('Zezinho')),
+      ).toBe(true);
+
+      const porCpfComMascara = await request(app.getHttpServer())
+        .get(`/api/alunos?search=${encodeURIComponent(CPF_VALIDO_1)}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(
+        porCpfComMascara.body.items.some((a: { nome: string }) => a.nome.includes('Zezinho')),
+      ).toBe(true);
 
       const semResultado = await request(app.getHttpServer())
         .get('/api/alunos?search=NomeQueNaoExisteInventadoXYZ')

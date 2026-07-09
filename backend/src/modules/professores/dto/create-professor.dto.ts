@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
-import { IsCPF } from '../../../common/validators/is-cpf.decorator';
+import { IsCPF, NormalizeCPF } from '../../../common/validators/is-cpf.decorator';
 
 export class CreateProfessorDto {
   @ApiProperty()
@@ -9,6 +9,7 @@ export class CreateProfessorDto {
   nome!: string;
 
   @ApiProperty({ example: '111.444.777-35' })
+  @NormalizeCPF()
   @IsCPF()
   cpf!: string;
 

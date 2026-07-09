@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { registerDecorator, ValidationOptions } from 'class-validator';
 
 /// Sequências que passam matematicamente no algoritmo de dígito
@@ -50,4 +51,14 @@ export function IsCPF(validationOptions?: ValidationOptions) {
       },
     });
   };
+}
+
+/// Remove a pontuação do CPF antes de validar/persistir — sem isso, o
+/// mesmo CPF com/sem máscara ("111.444.777-35" vs "11144477735") burlaria
+/// o `@@unique([academiaId, cpf])` e a pesquisa por CPF (que faz `contains`
+/// literal na string armazenada) ficaria sensível à formatação de entrada.
+export function NormalizeCPF() {
+  return Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.replace(/\D/g, '') : value,
+  );
 }

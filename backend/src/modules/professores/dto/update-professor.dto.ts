@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
-import { IsCPF } from '../../../common/validators/is-cpf.decorator';
+import { IsCPF, NormalizeCPF } from '../../../common/validators/is-cpf.decorator';
 
 export class UpdateProfessorDto {
   @ApiPropertyOptional()
@@ -11,6 +11,7 @@ export class UpdateProfessorDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @NormalizeCPF()
   @IsCPF()
   cpf?: string;
 

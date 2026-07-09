@@ -136,6 +136,26 @@ describe('Professores (e2e)', () => {
       .expect(201);
   });
 
+  it('CPF é normalizado (sem pontuação) e a unicidade não pode ser burlada trocando a máscara', async () => {
+    const academia = await createAcademiaFixture(prisma, {
+      nome: 'Academia CPF Normalizado Prof E2E',
+    });
+    const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+
+    const criado = await request(app.getHttpServer())
+      .post('/api/professores')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'Professor CPF Mascarado', cpf: CPF_VALIDO_1, telefone: '11999999999' })
+      .expect(201);
+    expect(criado.body.cpf).toBe('11144477735');
+
+    await request(app.getHttpServer())
+      .post('/api/professores')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'Outro Professor', cpf: '11144477735', telefone: '11999999999' })
+      .expect(409);
+  });
+
   it('isolamento entre tenants: academia A não vê/edita/deleta professor da academia B', async () => {
     const academiaA = await createAcademiaFixture(prisma, {
       nome: 'Academia Isolamento A Prof E2E',
@@ -183,6 +203,20 @@ describe('Professores (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     expect(porNome.body.total).toBe(1);
+
+    // CPF cadastrado com máscara ('111.444.777-35') — a pesquisa precisa
+    // achar tanto digitando só números quanto digitando com a máscara.
+    const porCpfSemMascara = await request(app.getHttpServer())
+      .get('/api/professores?search=11144477735')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(porCpfSemMascara.body.total).toBe(1);
+
+    const porCpfComMascara = await request(app.getHttpServer())
+      .get(`/api/professores?search=${encodeURIComponent(CPF_VALIDO_1)}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(porCpfComMascara.body.total).toBe(1);
 
     const pagina1 = await request(app.getHttpServer())
       .get('/api/professores?pageSize=1&page=1')

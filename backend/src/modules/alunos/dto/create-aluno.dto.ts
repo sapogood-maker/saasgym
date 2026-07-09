@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Sexo } from '@prisma/client';
 import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { IsCPF } from '../../../common/validators/is-cpf.decorator';
+import { IsCPF, NormalizeCPF } from '../../../common/validators/is-cpf.decorator';
 
 export class CreateAlunoDto {
   @ApiProperty()
@@ -10,6 +10,7 @@ export class CreateAlunoDto {
   nome!: string;
 
   @ApiProperty({ example: '111.444.777-35' })
+  @NormalizeCPF()
   @IsCPF()
   cpf!: string;
 

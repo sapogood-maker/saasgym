@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Sexo } from '@prisma/client';
 import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { IsCPF } from '../../../common/validators/is-cpf.decorator';
+import { IsCPF, NormalizeCPF } from '../../../common/validators/is-cpf.decorator';
 
 export class UpdateAlunoDto {
   @ApiPropertyOptional()
@@ -12,6 +12,7 @@ export class UpdateAlunoDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @NormalizeCPF()
   @IsCPF()
   cpf?: string;
 
