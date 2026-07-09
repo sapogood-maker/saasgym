@@ -13,7 +13,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Academia } from '@prisma/client';
 import { AdminAcademiaConfiguracaoService } from './admin-academia-configuracao.service';
@@ -26,9 +25,7 @@ import { UpdateAcademiaDto } from './dto/update-academia.dto';
 import { UpdateAcademiaConfiguracaoDto } from './dto/update-academia-configuracao.dto';
 import { UpdateAcademiaStatusDto } from './dto/update-academia-status.dto';
 import { SystemAdminGuard } from '../../../common/guards/system-admin.guard';
-
-const LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const LOGO_MAX_SIZE_BYTES = 2 * 1024 * 1024;
+import { ImageFileInterceptor } from '../../../common/upload/image-file-interceptor';
 
 /// 100% restrito a SYSTEM_ADMIN — nenhum usuário de academia acessa nada
 /// aqui (ver docs/13-admin-saas.md).
@@ -108,18 +105,7 @@ export class AdminAcademiaController {
   @ApiBody({
     schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
   })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      limits: { fileSize: LOGO_MAX_SIZE_BYTES },
-      fileFilter: (_req, file, callback) => {
-        if (!LOGO_MIME_TYPES.includes(file.mimetype)) {
-          callback(new BadRequestException('Formato não suportado — use PNG, JPEG ou WebP'), false);
-          return;
-        }
-        callback(null, true);
-      },
-    }),
-  )
+  @UseInterceptors(ImageFileInterceptor())
   async uploadLogo(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,

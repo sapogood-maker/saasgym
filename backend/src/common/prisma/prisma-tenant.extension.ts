@@ -2,11 +2,11 @@ import { Prisma } from '@prisma/client';
 import { TenantContextService } from '../context/tenant-context.service';
 
 /// Models tenant-scoped que devem ser filtrados automaticamente por
-/// academiaId. Só `User` existe hoje — as entidades de negócio (Aluno,
-/// Professor, Plano, Agenda, Financeiro...) entram aqui a partir do
-/// Sprint 2, e passam a ser protegidas por esta mesma extensão sem
-/// precisar de nenhuma mudança nos services que as consultam.
-const TENANT_SCOPED_MODELS = new Set(['User']);
+/// academiaId. `Aluno`/`Professor` entraram no Sprint 3 — exatamente a
+/// mudança prevista desde o Sprint 1 (adicionar um model à lista, sem
+/// tocar na lógica abaixo). Próximas entidades de negócio (Plano, Agenda,
+/// Financeiro...) entram do mesmo jeito.
+const TENANT_SCOPED_MODELS = new Set(['User', 'Aluno', 'Professor']);
 
 const WHERE_OPERATIONS = new Set([
   'findFirst',

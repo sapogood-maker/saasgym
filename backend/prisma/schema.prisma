@@ -56,10 +56,29 @@ enum AuditAction {
   ACADEMIA_CONFIGURACAO_UPDATED
   PLANO_SAAS_CREATED
   PLANO_SAAS_UPDATED
+  ALUNO_CREATED
+  ALUNO_UPDATED
+  ALUNO_STATUS_CHANGED
+  ALUNO_DELETED
+  PROFESSOR_CREATED
+  PROFESSOR_UPDATED
+  PROFESSOR_STATUS_CHANGED
+  PROFESSOR_DELETED
+  USER_PROFILE_UPDATED
+  FOTO_UPLOADED
 }
 
 enum ArquivoCategoria {
   ACADEMIA_LOGO
+  ALUNO_FOTO
+  PROFESSOR_FOTO
+  USER_AVATAR
+}
+
+enum Sexo {
+  MASCULINO
+  FEMININO
+  OUTRO
 }
 
 /// Tenant: cada academia cliente do SaaS.
@@ -83,6 +102,8 @@ model Academia {
 
   users        User[]
   configuracao AcademiaConfiguracao?
+  alunos       Aluno[]
+  professores  Professor[]
 
   @@map("academias")
 }
@@ -153,9 +174,79 @@ model Arquivo {
   createdAt      DateTime         @default(now())
 
   academiaConfiguracao AcademiaConfiguracao?
+  alunoFoto            Aluno?
+  professorFoto        Professor?
+  userAvatar           User?
 
   @@index([academiaId])
   @@map("arquivos")
+}
+
+/// Aluno cadastrado por uma academia — tenant-scoped, soft delete (nunca
+/// removido fisicamente). CPF único só dentro da academia, não
+/// globalmente: a mesma pessoa pode, em tese, ser aluno em duas academias
+/// diferentes.
+model Aluno {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  fotoArquivoId String?  @unique
+  fotoArquivo   Arquivo? @relation(fields: [fotoArquivoId], references: [id])
+
+  nome           String
+  cpf            String
+  rg             String?
+  dataNascimento DateTime
+  sexo           Sexo
+  telefone       String
+  whatsapp       String?
+  email          String?
+  endereco       String?
+  cidade         String?
+  estado         String?
+  cep            String?
+  observacoes    String?
+  status         UserStatus @default(ATIVO)
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([academiaId, cpf])
+  @@index([academiaId])
+  @@map("alunos")
+}
+
+/// Professor cadastrado por uma academia — tenant-scoped, soft delete.
+/// Cadastro administrativo apenas nesta sprint: não cria conta de login
+/// própria (isso é um passo futuro, quando o portal/login do professor
+/// existir).
+model Professor {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  fotoArquivoId String?  @unique
+  fotoArquivo   Arquivo? @relation(fields: [fotoArquivoId], references: [id])
+
+  nome          String
+  cpf           String
+  telefone      String
+  email         String?
+  especialidade String?
+  observacoes   String?
+  status        UserStatus @default(ATIVO)
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([academiaId, cpf])
+  @@index([academiaId])
+  @@map("professores")
 }
 
 /// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
@@ -163,6 +254,9 @@ model User {
   id         String    @id @default(uuid())
   academiaId String?
   academia   Academia? @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  fotoArquivoId String?  @unique
+  fotoArquivo   Arquivo? @relation(fields: [fotoArquivoId], references: [id])
 
   nome              String
   email             String     @unique

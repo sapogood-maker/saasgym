@@ -62,6 +62,45 @@ describe('FileUploadService', () => {
     expect(arquivo).toEqual({ id: 'arquivo-1' });
   });
 
+  it.each([
+    ['uploadAlunoFoto', ArquivoCategoria.ALUNO_FOTO] as const,
+    ['uploadProfessorFoto', ArquivoCategoria.PROFESSOR_FOTO] as const,
+  ])('%s delega ao StorageProvider com a categoria certa', async (metodo, categoriaEsperada) => {
+    const arquivo = await service[metodo]('academia-1', {
+      buffer: Buffer.from('x'),
+      originalname: 'foto.png',
+      mimetype: 'image/png',
+    });
+
+    expect(storageProvider.upload).toHaveBeenCalledWith(categoriaEsperada, Buffer.from('x'), {
+      nomeOriginal: 'foto.png',
+      mimeType: 'image/png',
+    });
+    expect(prisma.arquivo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ academiaId: 'academia-1', categoria: categoriaEsperada }),
+      }),
+    );
+    expect(arquivo).toEqual({ id: 'arquivo-1' });
+  });
+
+  it('uploadUserAvatar aceita academiaId nulo (SYSTEM_ADMIN)', async () => {
+    await service.uploadUserAvatar(null, {
+      buffer: Buffer.from('x'),
+      originalname: 'avatar.png',
+      mimetype: 'image/png',
+    });
+
+    expect(prisma.arquivo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          academiaId: null,
+          categoria: ArquivoCategoria.USER_AVATAR,
+        }),
+      }),
+    );
+  });
+
   it('resolveUrl delega ao StorageProvider', async () => {
     const url = await service.resolveUrl('academias/logos/abc.png');
     expect(storageProvider.getSignedUrl).toHaveBeenCalledWith('academias/logos/abc.png');

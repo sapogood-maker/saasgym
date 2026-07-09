@@ -12,6 +12,9 @@ import { StorageProvider, UploadOptions, UploadResult } from './storage-provider
 /// enum ArquivoCategoria quando o módulo correspondente existir.
 const CATEGORIA_PASTA: Record<ArquivoCategoria, string> = {
   [ArquivoCategoria.ACADEMIA_LOGO]: 'academias/logos',
+  [ArquivoCategoria.ALUNO_FOTO]: 'alunos/fotos',
+  [ArquivoCategoria.PROFESSOR_FOTO]: 'professores/fotos',
+  [ArquivoCategoria.USER_AVATAR]: 'usuarios/avatares',
 };
 
 /// Implementação de referência do StorageProvider — grava em disco, num
