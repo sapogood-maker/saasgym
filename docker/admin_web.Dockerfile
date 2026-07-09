@@ -23,7 +23,12 @@ COPY student_web ./student_web
 COPY packages ./packages
 
 WORKDIR /workspace/admin_web
-RUN flutter build web --release --no-wasm-dry-run
+# URL pública da API que o navegador do cliente vai chamar — nunca o nome
+# de serviço interno do Docker Compose (o navegador não resolve DNS
+# interno do compose). Web app é estático: o valor é embutido no JS no
+# momento do build, não pode ser trocado em runtime sem rebuildar.
+ARG API_BASE_URL=http://localhost:3000/api
+RUN flutter build web --release --no-wasm-dry-run --dart-define=API_BASE_URL=${API_BASE_URL}
 
 FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS production
 COPY docker/nginx/spa.conf /etc/nginx/conf.d/default.conf

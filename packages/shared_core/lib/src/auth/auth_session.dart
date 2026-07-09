@@ -50,7 +50,10 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
   @override
   AuthSessionState build() => const AuthSessionState();
 
-  void setSession({required String accessToken, required AuthenticatedUser user}) {
+  void setSession({
+    required String accessToken,
+    required AuthenticatedUser user,
+  }) {
     state = AuthSessionState(accessToken: accessToken, user: user);
   }
 
@@ -59,6 +62,7 @@ class AuthSessionNotifier extends Notifier<AuthSessionState> {
   }
 }
 
-final authSessionProvider = NotifierProvider<AuthSessionNotifier, AuthSessionState>(
-  AuthSessionNotifier.new,
-);
+final authSessionProvider =
+    NotifierProvider<AuthSessionNotifier, AuthSessionState>(
+      AuthSessionNotifier.new,
+    );

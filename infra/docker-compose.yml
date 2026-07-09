@@ -51,6 +51,10 @@ services:
     build:
       context: ..
       dockerfile: docker/admin_web.Dockerfile
+      args:
+        # URL que o NAVEGADOR do cliente usa — precisa ser alcançável de
+        # fora do compose (nunca o nome de serviço "backend").
+        API_BASE_URL: ${ADMIN_WEB_API_BASE_URL:-http://localhost:3000/api}
     restart: unless-stopped
     depends_on:
       - backend
