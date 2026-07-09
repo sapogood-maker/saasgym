@@ -31,3 +31,7 @@ Cada módulo de domínio (`backend/src/modules/<dominio>/`) expõe seu próprio 
 ## Autenticação
 
 Ver `docs/10-auth.md` para os endpoints (`/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`, `/auth/password`) e o fluxo completo.
+
+## Administração do SaaS
+
+Endpoints em `/admin/*` — 100% restritos a `SYSTEM_ADMIN` (`SystemAdminGuard`), nunca acessíveis a usuários de academia. Ver `docs/13-admin-saas.md` para o módulo completo (academias, planos SaaS, dashboard).

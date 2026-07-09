@@ -7,6 +7,20 @@ enum Environment {
   Test = 'test',
 }
 
+// "local" é a única implementação que existe nesta sprint. As demais já
+// entram na validação para que escolher uma delas falhe alto e claro no
+// boot (em vez de silenciosamente cair para "local" ou explodir mais tarde
+// no primeiro upload) — StorageModule lança um erro explícito ao montar o
+// provider se a implementação ainda não existir.
+export enum StorageProviderType {
+  Local = 'local',
+  R2 = 'r2',
+  S3 = 's3',
+  GoogleDrive = 'google-drive',
+  MinIO = 'minio',
+  Backblaze = 'backblaze',
+}
+
 class EnvironmentVariables {
   @IsIn([Environment.Development, Environment.Production, Environment.Test])
   NODE_ENV: Environment = Environment.Development;
@@ -37,6 +51,16 @@ class EnvironmentVariables {
 
   @IsString()
   CORS_ORIGINS: string = 'http://localhost:5000,http://localhost:5001';
+
+  @IsIn(Object.values(StorageProviderType))
+  STORAGE_PROVIDER: StorageProviderType = StorageProviderType.Local;
+
+  @IsString()
+  UPLOADS_DIR: string = './uploads';
+
+  @IsInt()
+  @Min(1)
+  TRIAL_DURATION_DAYS: number = 14;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

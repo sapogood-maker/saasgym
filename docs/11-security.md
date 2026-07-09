@@ -1,6 +1,6 @@
 # Segurança
 
-Implementado no Sprint 1. Complementa `docs/01-arquitetura.md` (visão geral) e `docs/10-auth.md` (autenticação).
+Implementado no Sprint 1, com adições no Sprint 2 (status da academia, upload de arquivos). Complementa `docs/01-arquitetura.md` (visão geral), `docs/10-auth.md` (autenticação) e `docs/13-admin-saas.md` (administração do SaaS).
 
 ## Cabeçalhos HTTP (Helmet)
 
@@ -45,9 +45,17 @@ Restrito a `CORS_ORIGINS` (lista explícita, sem wildcard), com `credentials: tr
 
 `ValidationPipe` global (`whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`) — payloads com campos não declarados no DTO são rejeitados, não apenas ignorados.
 
+## Status da academia (Sprint 2)
+
+`AuthService.login`/`refresh` checam `academia.status` (não só `user.status`): `SUSPENSA`/`BLOQUEADA`/`CANCELADA` bloqueiam login (mesmo com credenciais corretas — a checagem roda **depois** do `bcrypt.compare`, para não introduzir um atalho de timing distinguível de "senha errada") e refresh. Ver `docs/13-admin-saas.md` para as transições de status e a revogação em cascata de sessões que acontece ao entrar num status bloqueante — mesma classe de trade-off do JWT stateless abaixo: o access token já emitido continua valendo até expirar.
+
+## Upload de arquivos (Sprint 2)
+
+Validação de MIME type e tamanho no `FileInterceptor` (Multer), antes de qualquer escrita em disco — ver `docs/13-admin-saas.md`. Nome físico sempre gerado (UUID), nunca o nome original do arquivo enviado pelo cliente — evita path traversal e colisão de nomes.
+
 ## Trade-offs conhecidos (documentados, não esquecidos)
 
-- **JWT stateless**: ver `docs/10-auth.md` — um access token vazado continua válido até expirar (≤15min), mesmo após troca de senha.
+- **JWT stateless**: ver `docs/10-auth.md` — um access token vazado continua válido até expirar (≤15min), mesmo após troca de senha ou a academia ser bloqueada.
 - **Rate limiting em memória**: `@nestjs/throttler` guarda contadores no processo. Com múltiplas réplicas do backend (escala horizontal), cada instância teria seu próprio contador — o limite efetivo multiplicaria pelo número de réplicas. Não é um problema na escala atual (uma instância); se/quando houver múltiplas réplicas, trocar para um storage compartilhado (Redis) é a migração natural, sem mudar a API do `ThrottlerModule`.
 - **Sem rotação de chave JWT**: `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET` são segredos únicos por ambiente (validados com mínimo de 32 caracteres no boot — `env.validation.ts`). Trocar a chave hoje invalida todos os access tokens emitidos (aceitável — eles já expiram em 15min) mas é uma decisão manual, sem suporte a múltiplas chaves simultâneas (`kid` no header do JWT). Não implementado por não ser necessário agora; documentado aqui como ponto de extensão futuro caso o produto precise de rotação sem downtime.
 - **Vulnerabilidades conhecidas e aceitas**: `qs`/`body-parser`/`express` (transitivas de `@nestjs/platform-express`) têm avisos moderados/altos de DoS via parsing de query string — resolver exige subir para NestJS v11 (breaking change), tratado como item futuro dedicado (ver `PRODUCTION_READINESS.md` do Sprint 0).

@@ -37,8 +37,15 @@ services:
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
       CORS_ORIGINS: ${CORS_ORIGINS}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      UPLOADS_DIR: /app/uploads
+      TRIAL_DURATION_DAYS: ${TRIAL_DURATION_DAYS:-14}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      # Persiste uploads (logos etc.) entre restarts/rebuilds do container —
+      # sem isso, o provider local perderia todo arquivo a cada deploy.
+      - uploads_data:/app/uploads
 
   admin_web:
     build:
@@ -62,3 +69,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

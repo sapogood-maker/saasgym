@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -25,6 +26,14 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
+
+  // Servido fora do prefixo /api (useStaticAssets não respeita
+  // setGlobalPrefix) e antes do pipeline de guards do Nest — correto para
+  // categorias públicas (logo). Categorias privadas usariam
+  // getSignedUrl()/um endpoint autenticado, não static assets.
+  app.useStaticAssets(resolve(config.get<string>('UPLOADS_DIR', './uploads')), {
+    prefix: '/uploads',
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -3,6 +3,7 @@ import { Academia, AuditAction, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { createTestApp } from './utils/create-test-app';
+import { createAcademiaFixture } from './utils/fixtures';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 function extractRefreshCookie(response: request.Response): string {
@@ -25,8 +26,9 @@ describe('Auth (e2e)', () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
 
-    testAcademia = await prisma.academia.create({
-      data: { nome: 'Academia E2E Auth', cnpj: `E2E-${Date.now()}` },
+    testAcademia = await createAcademiaFixture(prisma, {
+      nome: 'Academia E2E Auth',
+      cnpj: `E2E-${Date.now()}`,
     });
 
     await prisma.user.create({

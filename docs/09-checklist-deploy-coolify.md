@@ -1,6 +1,6 @@
 # Checklist de Deploy — Coolify
 
-Repositório: `https://github.com/sapogood-maker/saasgym` (branch `main`, tag `v0.1.0`).
+Repositório: `https://github.com/sapogood-maker/saasgym` (branch `main`).
 
 Este checklist assume o modelo já documentado em `docs/06-deploy-coolify.md`: **3 aplicações Coolify separadas** + **1 recurso PostgreSQL gerenciado**, todas apontando para o mesmo repositório. Não use `infra/docker-compose.yml` diretamente no Coolify — ele é só para desenvolvimento local.
 
@@ -8,7 +8,7 @@ Este checklist assume o modelo já documentado em `docs/06-deploy-coolify.md`: *
 
 - [ ] No Coolify: **New Resource → Database → PostgreSQL** (versão 16).
 - [ ] Anotar a `DATABASE_URL` interna gerada pelo Coolify (formato `postgresql://user:pass@host:5432/db`).
-- [ ] Confirmar que o backup automático do Coolify para esse banco está ativo (proteção de infraestrutura — complementar ao módulo `backup` do próprio SaaSGym, que chega no Sprint 8).
+- [ ] Confirmar que o backup automático do Coolify para esse banco está ativo (proteção de infraestrutura — complementar ao módulo `backup` do próprio SaaSGym, ainda não implementado — ver `docs/08-roadmap.md`).
 
 ## 2. Backend (`saasgym-backend`)
 
@@ -29,10 +29,14 @@ Este checklist assume o modelo já documentado em `docs/06-deploy-coolify.md`: *
   | `JWT_ACCESS_EXPIRATION` | `15m` |
   | `JWT_REFRESH_EXPIRATION` | `7d` |
   | `CORS_ORIGINS` | os domínios reais do admin_web e student_web (passo 3 e 4), separados por vírgula — sem `http://localhost` |
+  | `STORAGE_PROVIDER` | `local` (única implementação disponível — ver `docs/13-admin-saas.md`) |
+  | `TRIAL_DURATION_DAYS` | `14` (ou o valor desejado) |
 
+- [ ] **Volume persistente**: montar um volume em `/app/uploads` (Coolify → aba "Storages" da aplicação → "Add Volume", destino `/app/uploads`). Sem isso, todo logo/arquivo enviado é perdido no próximo deploy — o filesystem do container não é persistente por padrão.
 - [ ] Deploy e conferir nos logs: `Applying migration...` → `Seed concluído` → `Nest application successfully started`.
 - [ ] Testar `https://<domínio-backend>/api/health` → `{"status":"ok",...}`.
 - [ ] Testar `https://<domínio-backend>/api/docs` (Swagger).
+- [ ] Testar upload real: `POST /api/admin/academias/:id/logo` seguido de `GET` na URL retornada — se der `EACCES` no log, o volume foi criado com dono `root` e o container roda como usuário `node` (não-root); recriar o volume costuma resolver (o Dockerfile já pré-cria `/app/uploads` com o dono certo, mas um volume manual criado antes dessa correção pode reter a permissão antiga).
 
 ## 3. Admin Web (`saasgym-admin-web`)
 
@@ -61,7 +65,8 @@ Este checklist assume o modelo já documentado em `docs/06-deploy-coolify.md`: *
 
 - [ ] `GET /api/health` — `200`.
 - [ ] `GET /api/docs` — Swagger carrega.
-- [ ] Login **ainda não existe** (Sprint 1) — não é esperado testar autenticação real neste deploy.
+- [ ] `POST /api/auth/login` com as credenciais do seed (`admin@saasgym.com`) — `200` com `accessToken`.
+- [ ] `POST /api/admin/academias` autenticado como `SYSTEM_ADMIN` — cria academia de verdade, admin criado já consegue logar.
 - [ ] Confirmar nos 3 recursos que o healthcheck do Coolify mostra "Healthy" no dashboard.
 - [ ] Confirmar que `docker compose down -v` **nunca** deve ser usado contra o Postgres de produção (isso só existe no `infra/docker-compose.yml` local).
 

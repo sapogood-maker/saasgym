@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Academia, Role } from '@prisma/client';
 import { createTestApp } from './utils/create-test-app';
+import { createAcademiaFixture } from './utils/fixtures';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TenantContextService } from '../src/common/context/tenant-context.service';
 
@@ -21,11 +22,13 @@ describe('Prisma tenant isolation extension (e2e)', () => {
     prisma = app.get(PrismaService);
     tenantContext = app.get(TenantContextService);
 
-    academiaA = await prisma.academia.create({
-      data: { nome: 'Academia A - tenant ext', cnpj: `TENANT-A-${Date.now()}` },
+    academiaA = await createAcademiaFixture(prisma, {
+      nome: 'Academia A - tenant ext',
+      cnpj: `TENANT-A-${Date.now()}`,
     });
-    academiaB = await prisma.academia.create({
-      data: { nome: 'Academia B - tenant ext', cnpj: `TENANT-B-${Date.now()}` },
+    academiaB = await createAcademiaFixture(prisma, {
+      nome: 'Academia B - tenant ext',
+      cnpj: `TENANT-B-${Date.now()}`,
     });
 
     await prisma.user.createMany({

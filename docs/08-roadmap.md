@@ -2,22 +2,31 @@
 
 Cada sprint termina com o projeto compilando, rodando via Docker Compose local, e com o incremento documentado.
 
+Reescrito ao final do Sprint 2 (2026-07-08/09) — o roadmap do Sprint 0 não é mais tratado como definitivo. A fundação evoluiu (autenticação/multi-tenant completos, infraestrutura de administração do SaaS pronta) e a sequência dos módulos de negócio foi reordenada em função disso, não do plano original.
+
 | Sprint | Entrega | Status |
 |---|---|---|
 | **0 — Fundação** | Estrutura de pastas; NestJS bootstrap + Swagger + health-check; Prisma inicial (`Academia`, `User`, `RefreshToken`); workspace Melos + `shared_core` skeleton; `docker-compose.yml` local; CI skeleton; docs base. | ✅ Concluído |
 | **1 — Autenticação, Autorização & Multi-tenant** | Módulo `auth` completo (login/refresh com rotação e detecção de reuso/logout/troca de senha); guards (`JwtAuthGuard`/`RolesGuard`/`AcademiaGuard`/`SystemAdminGuard`) e decorators (`@Public`/`@Roles`/`@CurrentUser`/`@CurrentAcademia`); `TenantContext` (AsyncLocalStorage) + extensão do Prisma com filtro automático por `academiaId`; auditoria (`AuditLog`); hardening (Helmet, rate limiting, filtro global de exceções); CI com Postgres de serviço + e2e. | ✅ Concluído |
-| **2 — Alunos & Professores** | CRUD `Aluno` (com upload de foto via `StorageProvider`); CRUD `Professor`; telas de listagem/cadastro/edição no `admin_web`; primeiro uso real de `AcademiaGuard`/`RolesGuard`/`forTenant()` em endpoints de negócio; telas de login em `admin_web`/`student_web` consumindo o módulo `auth`. | Próximo |
-| **3 — Planos & Modalidades** | CRUD `Plano`, `Modalidade`; matrícula do aluno em um plano (`Matricula`). | Planejado |
-| **4 — Agenda (núcleo)** | `Turma`, geração de `Aula`, `AulaAluno` (matrícula, capacidade máxima, fila de espera); tela de agenda semanal. | Planejado |
-| **5 — Agenda avançada** | Reposições e `SolicitacaoAgenda` (troca de horário); interface `NotificationProvider` preparada (sem envio real). | Planejado |
-| **6 — Financeiro** | Geração de `Mensalidade` a partir de `Matricula`; `Lancamento` (receita/despesa); fluxo de caixa, formas de pagamento, inadimplência. | Planejado |
-| **7 — Dashboard** | Endpoints agregados (alunos ativos, agenda do dia, faturamento, vencidas, próximos vencimentos); tela dashboard. | Planejado |
-| **8 — Backup** | `StorageProvider` finalizado + `GoogleDriveProvider`; módulo `backup` (pg_dump → zip → upload manual, histórico). | Planejado |
-| **9 — Portal do Aluno (MVP)** | `student_web`: login, agenda, pagamentos (visualização), atualização de dados, presença, avisos, solicitar troca/reposição. | Planejado |
-| **10 — Treinos (estrutura)** | CRUD `Exercicio`, `Treino`, `TreinoExercicio`; upload de foto/vídeo. Sem IA. | Planejado |
-| **11 — Deploy produção & revisão final** | Logging estruturado; deploy Coolify (staging + produção); revisão final da documentação e da cobertura de testes de todos os módulos de negócio. (Testes automatizados, rate limiting e filtro global de exceções já entregues no Sprint 1.) | Planejado |
+| **2 — Administração do SaaS** | Módulo `admin` (100% `SYSTEM_ADMIN`): cadastro/ciclo de vida de academias (`AcademiaProvisioningService`, transacional); status (`TRIAL`/`ATIVA`/`SUSPENSA`/`BLOQUEADA`/`CANCELADA`) aplicado em login/refresh com revogação em cascata; `AcademiaConfiguracao` (branding); `PlanoSaas` (catálogo comercial do SaaS, sem cobrança ainda); `StorageProvider` real (`LocalDiskStorageProvider`) + primeiro uso (logo); dashboard do `SYSTEM_ADMIN`. | ✅ Concluído |
+| **3 — Alunos & Professores** | CRUD `Aluno` (upload de foto via `FileUploadService`/`StorageProvider`); CRUD `Professor`; primeiro uso real de `AcademiaGuard`/`RolesGuard`/`forTenant()` em endpoints de negócio; telas de login + CRUD no `admin_web`. | Próximo |
+| **4 — Planos & Modalidades & Matrícula** | CRUD `Plano` (mensalidade que a academia vende ao aluno — **não confundir com `PlanoSaas`**, já implementado no Sprint 2), `Modalidade`; `Matricula` (vincula `Aluno` a um `Plano`). | Planejado |
+| **5 — Agenda (núcleo)** | `Turma`, geração de `Aula`, `AulaAluno` (matrícula, capacidade máxima, fila de espera); tela de agenda semanal. | Planejado |
+| **6 — Agenda avançada** | Reposições e `SolicitacaoAgenda` (troca de horário); interface `NotificationProvider` preparada (sem envio real). | Planejado |
+| **7 — Financeiro** | Geração de `Mensalidade` a partir de `Matricula`; `Lancamento` (receita/despesa); fluxo de caixa, formas de pagamento, inadimplência. A partir daqui existem `Aluno`/`Professor`/`Financeiro` o bastante para começar o enforcement real dos limites de `PlanoSaas` (`limiteAlunos`/`limiteProfessores`), que até então só existiam como estrutura (ver `docs/13-admin-saas.md`). | Planejado |
+| **8 — Dashboard da academia** | Endpoints agregados por tenant (alunos ativos, agenda do dia, faturamento, vencidas, próximos vencimentos); tela dashboard no `admin_web`. Distinto do dashboard do `SYSTEM_ADMIN` (Sprint 2, visão cross-tenant da plataforma). | Planejado |
+| **9 — Backup** | A abstração já existe (`StorageProvider`, Sprint 2) — falta só `GoogleDriveProvider` (ou S3/R2, conforme decisão) + módulo `backup` (pg_dump → zip → upload → histórico) + agendamento. Sprint mais leve que o previsto originalmente, exatamente por causa do trabalho do Sprint 2. | Planejado |
+| **10 — Portal do Aluno (MVP) & Avisos** | `student_web`: login, agenda, pagamentos (visualização), atualização de dados, presença, solicitar troca/reposição; `Aviso`/`AvisoLeitura` (comunicados). Agrupados porque avisos são inteiramente portal-facing — não faz sentido construir a entidade antes de existir onde ela aparece. | Planejado |
+| **11 — Treinos (estrutura)** | CRUD `Exercicio`, `Treino`, `TreinoExercicio`; upload de foto/vídeo (reaproveita `Arquivo`/`FileUploadService` do Sprint 2). Sem IA. | Planejado |
+| **12 — Deploy produção & revisão final** | Logging estruturado; deploy Coolify real (staging + produção); revisão final da documentação e da cobertura de testes de todos os módulos de negócio. (Testes automatizados, rate limiting e filtro global de exceções já entregues no Sprint 1; hardening de storage/permissões de volume já entregue no Sprint 2.) | Planejado |
+
+## Por que essa reordenação
+
+O plano do Sprint 0 colocava Alunos & Professores logo após a autenticação. Ao planejar o Sprint 2, ficou claro que faltava a própria infraestrutura do SaaS antes disso: cadastro de tenants, ciclo de vida (trial/ativa/suspensa/bloqueada/cancelada), planos comerciais e um dashboard para o operador do SaaS — sem isso, não havia como uma academia sequer existir de forma administrada (só via seed manual). Construído isso, os módulos de negócio (Sprints 3+) agora têm uma fundação completa: toda academia nasce corretamente configurada, com um plano e um admin que já consegue logar, e há um lugar real para o `SYSTEM_ADMIN` gerenciar tudo.
 
 ## Decisões em aberto (não bloqueiam o início dos sprints correspondentes)
 
-- **Gateway de pagamento** para "pagar mensalidade" pelo portal do aluno (ex.: Mercado Pago, Asaas) — a integração deve seguir o mesmo padrão de abstração usado em `StorageProvider` (interface + implementação plugável). A decidir antes do Sprint 9.
-- **Canal real de notificações** (e-mail/WhatsApp/push) para o `NotificationProvider` do Sprint 5 — a interface é criada nesse sprint, a implementação concreta pode vir depois.
+- **Gateway de pagamento** para "pagar mensalidade" pelo portal do aluno (ex.: Mercado Pago, Asaas) — a integração deve seguir o mesmo padrão de abstração usado em `StorageProvider` (interface + implementação plugável). A decidir antes do Sprint 10.
+- **Canal real de notificações** (e-mail/WhatsApp/push) para o `NotificationProvider` do Sprint 6 — a interface é criada nesse sprint, a implementação concreta pode vir depois.
+- **Enforcement dos limites de `PlanoSaas`** — a estrutura (`limiteAlunos`, `limiteProfessores`, `limiteUsuarios`, `limiteArmazenamentoMb`, `limiteBackups`) existe desde o Sprint 2; decidir o mecanismo de enforcement (guard dedicado? checagem no service de criação?) e a UX de "limite atingido" antes do Sprint 7.
+- **Provider de storage em produção** — `LocalDiskStorageProvider` (Sprint 2) é adequado para uma única instância do backend; decidir se/quando migrar para R2/S3 antes de qualquer plano de escala horizontal do backend (múltiplas réplicas).

@@ -32,11 +32,11 @@ Isolamento em duas camadas:
 
 ## Storage desacoplado
 
-Interface `StorageProvider` (`backend/src/storage/storage-provider.interface.ts`) com `upload`, `download`, `delete`, `getSignedUrl`. Usada por:
-- **Backup** (`pg_dump` → zip → provider) — ver `docs/07-backups.md`.
-- **Uploads de usuário** (foto de aluno/professor, fotos/vídeos de treino) — mesma abstração, evitando duas lógicas de storage paralelas.
+Interface `StorageProvider` (`backend/src/storage/storage-provider.interface.ts`) com `upload`, `delete`, `getSignedUrl`. Implementada no Sprint 2 (primeiro uso real: logotipo da academia, ver `docs/13-admin-saas.md`) — usada por:
+- **Uploads de usuário** (logo de academia hoje; foto de aluno/professor, fotos/vídeos de treino nos sprints seguintes) — `FileUploadService` (`backend/src/storage/file-upload.service.ts`) é a camada que o resto do sistema efetivamente chama, combinando `StorageProvider.upload()` com o registro de metadados no model `Arquivo`.
+- **Backup** (`pg_dump` → zip → provider) — ver `docs/07-backups.md` (ainda não implementado).
 
-Local/dev usa um provider em disco; produção usa um provider S3-compatible (Cloudflare R2, S3, etc.). Novos provedores (Google Drive, OneDrive, Dropbox, Backblaze) são implementações adicionais da mesma interface, sem tocar no código que os consome.
+Provider escolhido em runtime via `STORAGE_PROVIDER` (env var). Única implementação hoje: `local` (`LocalDiskStorageProvider`, grava num volume Docker persistente). `r2`/`s3`/`google-drive`/`minio`/`backblaze` já são valores válidos na validação de ambiente, mas sem implementação — selecioná-los falha alto e claro no boot. Nenhum módulo de negócio importa uma implementação concreta diretamente, só a interface/`FileUploadService` — trocar de provider é escrever uma nova classe, sem tocar em quem consome.
 
 ## Autorização
 

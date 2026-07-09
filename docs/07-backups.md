@@ -1,6 +1,6 @@
 # Backups
 
-> Módulo `backup` previsto para o Sprint 8. Este documento define a arquitetura desde já.
+> Módulo `backup` ainda não implementado (ver `docs/08-roadmap.md`). Este documento define a arquitetura desde já. A interface `StorageProvider` que este módulo vai usar já existe, implementada no Sprint 2 (`backend/src/storage/`, ver `docs/13-admin-saas.md`) — falta escrever `GoogleDriveStorageProvider` (ou o provider decidido) e o módulo `backup` em si.
 
 ## Fluxo
 
@@ -30,7 +30,7 @@ A primeira implementação é `GoogleDriveStorageProvider`. Trocar ou adicionar 
 
 | Fase | Entrega |
 |---|---|
-| Sprint 8 | Backup **manual** via endpoint, execução do fluxo completo (`pg_dump` → zip → Google Drive), histórico consultável. |
+| Sprint do módulo `backup` (ver `docs/08-roadmap.md`) | Backup **manual** via endpoint, execução do fluxo completo (`pg_dump` → zip → Google Drive), histórico consultável. |
 | Futuro | Backup **automático** agendado, **download** direto pela UI, **restauração** guiada, múltiplos providers ativos simultaneamente. |
 
 ## Segurança

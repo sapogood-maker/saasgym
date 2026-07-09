@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuditAction, User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
+import { isAcademiaStatusBlocking } from '../../common/academia/academia-status.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TokenService } from './tokens/token.service';
 import { UserProfileDto } from './dto/user-profile.dto';
@@ -38,7 +39,10 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string, meta: RequestMetadata): Promise<LoginResult> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { academia: true },
+    });
     const passwordMatches = await bcrypt.compare(password, user?.senhaHash ?? DUMMY_PASSWORD_HASH);
 
     if (!user || user.status !== UserStatus.ATIVO || !passwordMatches) {
@@ -51,6 +55,24 @@ export class AuthService {
         userAgent: meta.userAgent,
       });
       throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    // Credenciais corretas, mas a academia está suspensa/bloqueada/
+    // cancelada — só chega aqui depois do bcrypt.compare acima, então não
+    // introduz um atalho de timing distinguível de "senha errada".
+    if (user.academia && isAcademiaStatusBlocking(user.academia.status)) {
+      await this.auditService.record({
+        action: AuditAction.LOGIN_FAILURE,
+        identifier: email,
+        userId: user.id,
+        academiaId: user.academiaId,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: { motivo: 'academia_status_bloqueante', status: user.academia.status },
+      });
+      throw new UnauthorizedException(
+        'Esta academia está com o acesso suspenso. Entre em contato com o suporte.',
+      );
     }
 
     const accessToken = await this.tokenService.signAccessToken({
@@ -100,7 +122,7 @@ export class AuthService {
     const tokenHash = this.tokenService.hashRefreshToken(rawToken);
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: { user: { include: { academia: true } } },
     });
 
     if (!stored) {
@@ -120,6 +142,10 @@ export class AuthService {
     }
 
     if (stored.expiresAt < new Date() || stored.user.status !== UserStatus.ATIVO) {
+      throw new UnauthorizedException('Refresh token inválido');
+    }
+
+    if (stored.user.academia && isAcademiaStatusBlocking(stored.user.academia.status)) {
       throw new UnauthorizedException('Refresh token inválido');
     }
 

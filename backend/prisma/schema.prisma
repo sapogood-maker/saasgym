@@ -26,10 +26,15 @@ enum Role {
   ALUNO
 }
 
+/// TRIAL/ATIVA permitem login. SUSPENSA/BLOQUEADA/CANCELADA bloqueiam login
+/// e refresh (ver AuthService) e revogam em cascata as sessões ativas ao
+/// entrar num desses estados (ver AdminAcademiaService).
 enum AcademiaStatus {
   TRIAL
   ATIVA
-  INATIVA
+  SUSPENSA
+  BLOQUEADA
+  CANCELADA
 }
 
 enum UserStatus {
@@ -45,31 +50,119 @@ enum AuditAction {
   REFRESH_TOKEN_USED
   REFRESH_TOKEN_REUSE_DETECTED
   SESSION_REVOKED
+  ACADEMIA_CREATED
+  ACADEMIA_UPDATED
+  ACADEMIA_STATUS_CHANGED
+  ACADEMIA_CONFIGURACAO_UPDATED
+  PLANO_SAAS_CREATED
+  PLANO_SAAS_UPDATED
+}
+
+enum ArquivoCategoria {
+  ACADEMIA_LOGO
 }
 
 /// Tenant: cada academia cliente do SaaS.
 model Academia {
-  id        String         @id @default(uuid())
-  nome      String
-  cnpj      String?        @unique
-  email     String?
-  telefone  String?
-  endereco  String?
-  logoUrl   String?
-  status    AcademiaStatus @default(TRIAL)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id       String         @id @default(uuid())
+  nome     String
+  cnpj     String?        @unique
+  email    String?
+  telefone String?
+  endereco String?
+  dominio  String?        @unique
+  status   AcademiaStatus @default(TRIAL)
 
-  users User[]
+  trialExpiresAt DateTime?
+
+  planoSaasId String
+  planoSaas   PlanoSaas @relation(fields: [planoSaasId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  configuracao AcademiaConfiguracao?
 
   @@map("academias")
 }
 
+/// Catálogo de planos comerciais do SaaS (Free/Trial/Basic/Professional/
+/// Enterprise) — não é tenant-scoped, é o próprio produto sendo vendido.
+/// limite* = null significa ilimitado. Sem enforcement ainda (não existe
+/// Aluno/Professor para comparar contra os limites) — só a estrutura.
+model PlanoSaas {
+  id    String  @id @default(uuid())
+  nome  String  @unique
+  ativo Boolean @default(true)
+  ordem Int?
+
+  limiteAlunos          Int?
+  limiteProfessores     Int?
+  limiteUsuarios        Int?
+  limiteArmazenamentoMb Int?
+  limiteBackups         Int?
+  funcionalidades       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  academias Academia[]
+
+  @@map("planos_saas")
+}
+
+/// Branding/configuração de cada academia — separado do cadastro
+/// administrativo (Academia) porque representa um tipo de dado diferente
+/// (apresentação, não identidade legal do tenant). 1:1 com Academia.
+model AcademiaConfiguracao {
+  id         String   @id @default(uuid())
+  academiaId String   @unique
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  logoArquivoId String?  @unique
+  logoArquivo   Arquivo? @relation(fields: [logoArquivoId], references: [id])
+
+  temaCores            Json?
+  whatsapp             String?
+  instagram            String?
+  facebook             String?
+  pix                  String?
+  horarioFuncionamento Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("academia_configuracoes")
+}
+
+/// Metadados de qualquer arquivo enviado via StorageProvider — ponto único
+/// reaproveitado por qualquer módulo futuro que precise de upload (aluno,
+/// professor, exercício, documento...), não só o logo da academia. O banco
+/// nunca guarda o arquivo em si, só onde ele está e como chegou lá.
+model Arquivo {
+  id             String           @id @default(uuid())
+  academiaId     String?
+  categoria      ArquivoCategoria
+  nomeOriginal   String
+  nomeArmazenado String
+  caminho        String
+  mimeType       String
+  tamanhoBytes   Int
+  provider       String
+  createdAt      DateTime         @default(now())
+
+  academiaConfiguracao AcademiaConfiguracao?
+
+  @@index([academiaId])
+  @@map("arquivos")
+}
+
 /// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
 model User {
-  id        String     @id @default(uuid())
+  id         String    @id @default(uuid())
   academiaId String?
-  academia  Academia?  @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+  academia   Academia? @relation(fields: [academiaId], references: [id], onDelete: Cascade)
 
   nome              String
   email             String     @unique

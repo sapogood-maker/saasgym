@@ -28,6 +28,11 @@ RUN apk add --no-cache openssl=3.5.7-r0
 WORKDIR /app
 ENV NODE_ENV=production
 RUN chown node:node /app
+# Pré-cria o mount point do volume de uploads com o dono certo — um volume
+# nomeado novo herda permissão/conteúdo do diretório da imagem na primeira
+# vez que é montado; sem isso, o Docker cria o mount point como root e o
+# processo (rodando como "node", não-root) não consegue escrever nele.
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
 COPY --chown=node:node backend/package*.json ./
 COPY --chown=node:node backend/prisma ./prisma
 USER node

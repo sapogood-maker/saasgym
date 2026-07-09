@@ -14,6 +14,17 @@ describe('validateEnv', () => {
     expect(result.NODE_ENV).toBe('development');
     expect(result.PORT).toBe(3000);
     expect(result.JWT_ACCESS_EXPIRATION).toBe('15m');
+    expect(result.STORAGE_PROVIDER).toBe('local');
+    expect(result.UPLOADS_DIR).toBe('./uploads');
+    expect(result.TRIAL_DURATION_DAYS).toBe(14);
+  });
+
+  it('aceita um STORAGE_PROVIDER futuro ainda sem implementação (validação de env não é validação de feature)', () => {
+    expect(() => validateEnv({ ...validConfig, STORAGE_PROVIDER: 's3' })).not.toThrow();
+  });
+
+  it('rejeita STORAGE_PROVIDER fora do enum permitido', () => {
+    expect(() => validateEnv({ ...validConfig, STORAGE_PROVIDER: 'dropbox' })).toThrow();
   });
 
   it('rejeita JWT_ACCESS_SECRET com menos de 32 caracteres', () => {
