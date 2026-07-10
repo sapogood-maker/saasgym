@@ -55,6 +55,11 @@ export class LocalDiskStorageProvider implements StorageProvider {
   }
 
   getSignedUrl(caminho: string): Promise<string> {
-    return Promise.resolve(`/uploads/${caminho}`);
+    // PUBLIC_API_PREFIX: mesma razão do Path do cookie de refresh em
+    // AuthController — atrás de um proxy que publica a API sob um path
+    // externo, a URL de upload precisa incluir esse prefixo para o navegador
+    // conseguir buscar o arquivo de volta.
+    const publicApiPrefix = this.configService.get<string>('PUBLIC_API_PREFIX', '');
+    return Promise.resolve(`${publicApiPrefix}/uploads/${caminho}`);
   }
 }

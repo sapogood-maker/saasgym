@@ -8,10 +8,15 @@ import { LocalDiskStorageProvider } from './local-disk-storage.provider';
 describe('LocalDiskStorageProvider', () => {
   let uploadsDir: string;
   let provider: LocalDiskStorageProvider;
+  let publicApiPrefix: string;
 
   beforeEach(async () => {
     uploadsDir = await mkdtemp(join(tmpdir(), 'saasgym-storage-'));
-    const configService = { get: () => uploadsDir } as unknown as ConfigService;
+    publicApiPrefix = '';
+    const configService = {
+      get: (key: string, defaultValue?: unknown) =>
+        key === 'UPLOADS_DIR' ? uploadsDir : (publicApiPrefix ?? defaultValue),
+    } as unknown as ConfigService;
     provider = new LocalDiskStorageProvider(configService);
   });
 
@@ -61,6 +66,12 @@ describe('LocalDiskStorageProvider', () => {
   it('getSignedUrl resolve a URL pública estática (sem assinatura real no provider local)', async () => {
     const url = await provider.getSignedUrl('academias/logos/algum-arquivo.png');
     expect(url).toBe('/uploads/academias/logos/algum-arquivo.png');
+  });
+
+  it('getSignedUrl inclui PUBLIC_API_PREFIX quando configurado (deploy atrás de path externo)', async () => {
+    publicApiPrefix = '/saasgym-api';
+    const url = await provider.getSignedUrl('academias/logos/algum-arquivo.png');
+    expect(url).toBe('/saasgym-api/uploads/academias/logos/algum-arquivo.png');
   });
 
   it('delete remove o arquivo do disco', async () => {

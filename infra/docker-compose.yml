@@ -40,6 +40,7 @@ services:
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
       UPLOADS_DIR: /app/uploads
       TRIAL_DURATION_DAYS: ${TRIAL_DURATION_DAYS:-14}
+      PUBLIC_API_PREFIX: ${PUBLIC_API_PREFIX:-}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
@@ -65,6 +66,10 @@ services:
     build:
       context: ..
       dockerfile: docker/student_web.Dockerfile
+      args:
+        # URL que o NAVEGADOR do cliente usa — precisa ser alcançável de
+        # fora do compose (nunca o nome de serviço "backend").
+        API_BASE_URL: ${STUDENT_WEB_API_BASE_URL:-http://localhost:3000/api}
     restart: unless-stopped
     depends_on:
       - backend

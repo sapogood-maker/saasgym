@@ -58,6 +58,15 @@ class EnvironmentVariables {
   @IsString()
   UPLOADS_DIR: string = './uploads';
 
+  // Prefixo externo sob o qual o proxy reverso publica esta API (ex.:
+  // "/saasgym-api" quando servida via path em vez de domínio/subdomínio
+  // próprio) — precisa entrar no Path do cookie de refresh e na URL pública
+  // de upload, senão os dois ficam presos ao path interno ("/api", "/uploads")
+  // e param de bater com o que o navegador realmente chamou. Vazio (default)
+  // preserva o comportamento atual quando servido direto por domínio.
+  @IsString()
+  PUBLIC_API_PREFIX: string = '';
+
   @IsInt()
   @Min(1)
   TRIAL_DURATION_DAYS: number = 14;

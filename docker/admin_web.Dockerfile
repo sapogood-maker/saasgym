@@ -28,7 +28,12 @@ WORKDIR /workspace/admin_web
 # interno do compose). Web app é estático: o valor é embutido no JS no
 # momento do build, não pode ser trocado em runtime sem rebuildar.
 ARG API_BASE_URL=http://localhost:3000/api
-RUN flutter build web --release --no-wasm-dry-run --dart-define=API_BASE_URL=${API_BASE_URL}
+# Path base do próprio app quando publicado sob um subpath em vez da raiz do
+# domínio (ex.: "/saasgym/" atrás de um proxy compartilhado com outras
+# aplicações) — sem isso, os assets do build (main.dart.js, canvaskit/ etc.)
+# são referenciados a partir de "/" e quebram fora da raiz.
+ARG BASE_HREF=/
+RUN flutter build web --release --no-wasm-dry-run --dart-define=API_BASE_URL=${API_BASE_URL} --base-href=${BASE_HREF}
 
 FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS production
 COPY docker/nginx/spa.conf /etc/nginx/conf.d/default.conf

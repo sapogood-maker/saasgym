@@ -23,7 +23,6 @@ import { Public } from '../../common/decorators/public.decorator';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
-const REFRESH_COOKIE_PATH = '/api/auth';
 
 // Lido uma vez, na carga do módulo (decorators são avaliados no import, não
 // por requisição) — em NODE_ENV=test o limite sobe bastante, senão os
@@ -98,7 +97,7 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
     });
 
-    res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE_NAME, { path: this.refreshCookiePath() });
 
     return { success: true };
   }
@@ -128,13 +127,22 @@ export class AuthController {
       { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
     );
 
-    res.clearCookie(REFRESH_COOKIE_NAME, { path: REFRESH_COOKIE_PATH });
+    res.clearCookie(REFRESH_COOKIE_NAME, { path: this.refreshCookiePath() });
 
     return { success: true };
   }
 
   private extractRefreshCookie(req: Request): string | undefined {
     return (req.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE_NAME];
+  }
+
+  // Precisa do prefixo público (PUBLIC_API_PREFIX) para que o Path do cookie
+  // bata com a URL que o navegador realmente chamou — atrás de um proxy que
+  // publica a API sob um path externo (ex.: "/saasgym-api" em vez de um
+  // domínio próprio), o path interno sozinho ("/api/auth") nunca combina com
+  // a requisição vista pelo browser, e o cookie simplesmente não volta.
+  private refreshCookiePath(): string {
+    return `${this.configService.get<string>('PUBLIC_API_PREFIX', '')}/api/auth`;
   }
 
   private setRefreshCookie(res: Response, token: string, expiresAt: Date): void {
@@ -145,7 +153,7 @@ export class AuthController {
       secure: isProduction,
       sameSite: isProduction ? 'none' : 'lax',
       expires: expiresAt,
-      path: REFRESH_COOKIE_PATH,
+      path: this.refreshCookiePath(),
     });
   }
 }

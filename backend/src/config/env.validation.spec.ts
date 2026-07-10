@@ -17,6 +17,7 @@ describe('validateEnv', () => {
     expect(result.STORAGE_PROVIDER).toBe('local');
     expect(result.UPLOADS_DIR).toBe('./uploads');
     expect(result.TRIAL_DURATION_DAYS).toBe(14);
+    expect(result.PUBLIC_API_PREFIX).toBe('');
   });
 
   it('aceita um STORAGE_PROVIDER futuro ainda sem implementação (validação de env não é validação de feature)', () => {
