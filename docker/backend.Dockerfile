@@ -17,7 +17,11 @@ FROM base AS deps
 # "npm ci" já dispara "prisma generate" sozinho via postinstall do
 # @prisma/client (o schema já está copiado acima) — não precisa de um RUN
 # separado aqui.
-RUN npm ci
+# --include=dev é explícito de propósito: se NODE_ENV=production vazar para
+# o build (ex.: Coolify injeta env vars marcadas "Available at Buildtime"
+# como ENV em cada stage), o npm pula devDependencies por padrão — e é lá
+# que mora o @nestjs/cli, necessário para "nest build" no estágio seguinte.
+RUN npm ci --include=dev
 
 FROM deps AS build
 COPY backend ./
