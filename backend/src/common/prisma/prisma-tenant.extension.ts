@@ -6,7 +6,7 @@ import { TenantContextService } from '../context/tenant-context.service';
 /// mudança prevista desde o Sprint 1 (adicionar um model à lista, sem
 /// tocar na lógica abaixo). Próximas entidades de negócio (Plano, Agenda,
 /// Financeiro...) entram do mesmo jeito.
-const TENANT_SCOPED_MODELS = new Set(['User', 'Aluno', 'Professor']);
+const TENANT_SCOPED_MODELS = new Set(['User', 'Aluno', 'Professor', 'Plano']);
 
 const WHERE_OPERATIONS = new Set([
   'findFirst',
