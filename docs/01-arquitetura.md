@@ -11,7 +11,7 @@ O SaaSGym é um **monorepo** com três aplicações e um pacote compartilhado:
 | `student_web/` | Portal do aluno | Flutter Web + Riverpod + GoRouter |
 | `packages/shared_core/` | Código compartilhado entre os dois Flutter Web | Dart puro/Flutter |
 
-Os dois frontends consomem exatamente a mesma API REST e o mesmo pacote `shared_core` (cliente HTTP, modelos, estado de autenticação, tema Material 3) — isso garante que `admin_web` e `student_web` nunca divirjam do contrato do backend.
+Os dois frontends consomem exatamente a mesma API REST e o mesmo pacote `shared_core` (cliente HTTP, modelos, estado de autenticação, Design System "Dark Premium" — ver `docs/15-design-system-e-padrao-crud.md`) — isso garante que `admin_web` e `student_web` nunca divirjam do contrato do backend nem da identidade visual.
 
 ## Backend: modular monolith
 

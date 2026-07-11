@@ -7,7 +7,7 @@ SaaS multi-tenant de gestão de academias.
 - `student_web/` — Portal do aluno (Flutter Web)
 - `packages/shared_core/` — Código Dart compartilhado entre os dois frontends
 - `infra/` — Docker Compose e configuração de ambiente
-- `docs/` — Arquitetura, banco de dados, autenticação, API, Docker, deploy, backups e roadmap
+- `docs/` — Arquitetura, banco de dados, autenticação, API, Docker, deploy, backups, roadmap, Design System e padrão de CRUD
 
 Comece pela documentação em [`docs/`](docs/01-arquitetura.md).
 
@@ -37,7 +37,7 @@ Para rodar tudo containerizado (mais próximo de produção), veja [`docs/05-doc
 ## Stack
 
 Backend: NestJS, Prisma, PostgreSQL, JWT, Swagger, Docker.
-Frontends: Flutter Web, Material 3, Riverpod, GoRouter.
+Frontends: Flutter Web, Design System próprio ("Dark Premium", não Material 3 padrão — ver `docs/15-design-system-e-padrao-crud.md`), Riverpod, GoRouter.
 Infra: Docker Compose, GitHub, Coolify.
 
 ## Roadmap

@@ -33,31 +33,83 @@ class DesignSystemGalleryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _Section(title: 'Colors', child: _ColorsShowcase()),
+              const _Section(
+                title: 'Colors',
+                description: 'Paleta Dark Premium — tokens nomeados por papel, nunca hex direto na tela.',
+                child: _ColorsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Typography', child: _TypographyShowcase()),
+              const _Section(
+                title: 'Typography',
+                description: 'Escala Archivo (UI) + JetBrains Mono (dados) — cor sempre aplicada no ponto de uso, nunca embutida no token.',
+                child: _TypographyShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Buttons', child: _ButtonsShowcase()),
+              const _Section(
+                title: 'Buttons',
+                description: 'AppButton — variantes, estados de loading/disabled e ícone opcional. Único botão do produto, nunca ElevatedButton/TextButton cru.',
+                child: _ButtonsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Cards', child: _CardsShowcase()),
+              const _Section(
+                title: 'Cards',
+                description: 'AppCard (superfície de conteúdo genérica) e MetricCard (indicador/KPI) — o mesmo MetricCard do Dashboard servirá Financeiro e Relatórios.',
+                child: _CardsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Lists', child: _ListsShowcase()),
+              const _Section(
+                title: 'Lists',
+                description: 'AppListToolbar (busca+filtros+ação primária), AppListTile (item de lista) e AppDetailRow (par rótulo/valor somente leitura, usado nos painéis de detalhe).',
+                child: _ListsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Chips', child: _ChipsShowcase()),
+              const _Section(
+                title: 'Chips',
+                description: 'AppBadge — status e contadores curtos. Tom semântico (success/warning/error/info) nunca substitui a cor de marca.',
+                child: _ChipsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Empty States', child: _EmptyStatesShowcase()),
+              const _Section(
+                title: 'Empty States',
+                description: 'EmptyState (vazio acionável, com próximo passo) e EmptyState.comingSoon (funcionalidade ainda não implementada, com a tag da sprint responsável).',
+                child: _EmptyStatesShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Skeleton', child: _SkeletonShowcase()),
+              const _Section(
+                title: 'Skeleton',
+                description: 'LoadingSkeleton — placeholder de carregamento com shimmer, respeita redução de movimento do sistema.',
+                child: _SkeletonShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Inputs', child: _InputsShowcase()),
+              const _Section(
+                title: 'Inputs',
+                description: 'AppTextField, AppSelect, AppDateField, AppAvatarPicker — mesmo chassi de validação (borda vermelha + mensagem + ícone), nenhum sabe de regra de domínio.',
+                child: _InputsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Forms', child: _FormsShowcase()),
+              const _Section(
+                title: 'Forms',
+                description: 'AppFormRow (grid responsivo: 2 colunas desktop, 1 mobile) e AppFormErrorBanner (erro de formulário — nunca SnackBar).',
+                child: _FormsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Dialogs', child: _DialogsShowcase()),
+              const _Section(
+                title: 'Dialogs',
+                description: 'AppConfirmDialog — único diálogo de decisão do produto (nunca AlertDialog cru), 5 variantes de tom.',
+                child: _DialogsShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Navigation', child: _NavigationShowcase()),
+              const _Section(
+                title: 'Navigation',
+                description: 'AppBreadcrumb, AppHeader, AppSidebar e AppPagination (paginação server-side: page/total/pageSize).',
+                child: _NavigationShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxl),
-              const _Section(title: 'Motion', child: _MotionShowcase()),
+              const _Section(
+                title: 'Motion',
+                description: 'AppMotion — durações e curva padrão de toda transição do produto, sempre respeitando MediaQuery.disableAnimations.',
+                child: _MotionShowcase(),
+              ),
               const SizedBox(height: AppSpacing.xxxl),
             ],
           ),
@@ -69,9 +121,10 @@ class DesignSystemGalleryScreen extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   final String title;
+  final String description;
   final Widget child;
 
-  const _Section({required this.title, required this.child});
+  const _Section({required this.title, required this.description, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +133,8 @@ class _Section extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: AppTypography.labelSmall.copyWith(color: colors.primary)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(description, style: AppTypography.bodySmall.copyWith(color: colors.textFaint)),
         const SizedBox(height: AppSpacing.md),
         Container(height: 1, color: colors.border),
         const SizedBox(height: AppSpacing.lg),
@@ -214,41 +269,75 @@ class _CardsShowcase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.lg,
-      runSpacing: AppSpacing.lg,
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 320,
-          child: AppCard(
-            title: 'Aniversariantes do mês',
-            actions: [const AppBadge('4')],
-            child: const Text('Mariana Ferreira · 12/jul'),
-          ),
+        Text('AppCard', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.lg,
+          runSpacing: AppSpacing.lg,
+          children: [
+            SizedBox(
+              width: 320,
+              child: AppCard(
+                title: 'Aniversariantes do mês',
+                actions: [const AppBadge('4')],
+                child: const Text('Mariana Ferreira · 12/jul'),
+              ),
+            ),
+            SizedBox(
+              width: 320,
+              child: AppCard(
+                title: 'Card carregando',
+                subtitle: 'Simulação de loading',
+                loading: true,
+              ),
+            ),
+            SizedBox(
+              width: 320,
+              child: AppCard(
+                title: 'Card com rodapé',
+                footer: Text('Atualizado agora', style: AppTypography.bodySmall.copyWith(color: context.colors.textFaint)),
+                child: const Text('Conteúdo principal do card.'),
+              ),
+            ),
+            SizedBox(
+              width: 320,
+              child: AppCard(
+                title: 'Card clicável',
+                onTap: () {},
+                child: const Text('Hover/click para ver o feedback.'),
+              ),
+            ),
+          ],
         ),
-        SizedBox(
-          width: 320,
-          child: AppCard(
-            title: 'Card carregando',
-            subtitle: 'Simulação de loading',
-            loading: true,
-          ),
-        ),
-        SizedBox(
-          width: 320,
-          child: AppCard(
-            title: 'Card com rodapé',
-            footer: Text('Atualizado agora', style: AppTypography.bodySmall.copyWith(color: context.colors.textFaint)),
-            child: const Text('Conteúdo principal do card.'),
-          ),
-        ),
-        SizedBox(
-          width: 320,
-          child: AppCard(
-            title: 'Card clicável',
-            onTap: () {},
-            child: const Text('Hover/click para ver o feedback.'),
-          ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('MetricCard', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            const MetricCard(label: 'Alunos ativos', value: '128', icon: AppIcons.students),
+            const MetricCard(
+              label: 'Novos no mês',
+              value: '12',
+              icon: AppIcons.newStudent,
+              deltaLabel: '+8% vs. mês anterior',
+              trend: AppMetricTrend.up,
+              highlight: true,
+            ),
+            const MetricCard(
+              label: 'Inadimplência',
+              value: '4',
+              icon: AppIcons.finance,
+              deltaLabel: '-2 vs. semana anterior',
+              trend: AppMetricTrend.down,
+            ),
+            const MetricCard(label: 'Carregando', value: '—', loading: true),
+          ],
         ),
       ],
     );
@@ -489,7 +578,21 @@ class _InputsShowcaseState extends State<_InputsShowcase> {
           children: [
             const AppAvatarPicker(),
             const SizedBox(height: AppSpacing.xs),
-            Text('AppAvatarPicker', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+            Text('Vazio', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+          ],
+        ),
+        Column(
+          children: [
+            const AppAvatarPicker(loading: true),
+            const SizedBox(height: AppSpacing.xs),
+            Text('Enviando', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+          ],
+        ),
+        Column(
+          children: [
+            const AppAvatarPicker(enabled: false),
+            const SizedBox(height: AppSpacing.xs),
+            Text('Somente leitura', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
           ],
         ),
       ],
@@ -612,7 +715,11 @@ class _NavigationShowcase extends StatelessWidget {
         const SizedBox(height: AppSpacing.xl),
         Text('AppPagination', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
         const SizedBox(height: AppSpacing.sm),
-        AppPagination(page: 2, pageSize: 20, total: 128, onPageChanged: (_) {}),
+        AppPagination(page: 1, pageSize: 20, total: 128, onPageChanged: (_) {}),
+        const SizedBox(height: AppSpacing.sm),
+        AppPagination(page: 4, pageSize: 20, total: 128, onPageChanged: (_) {}),
+        const SizedBox(height: AppSpacing.sm),
+        AppPagination(page: 1, pageSize: 20, total: 12, onPageChanged: (_) {}),
       ],
     );
   }
