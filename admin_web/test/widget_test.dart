@@ -71,6 +71,19 @@ class _AlunosApiComUmAluno extends AlunosApi {
 class _ProfessoresApiComUmProfessor extends ProfessoresApi {
   _ProfessoresApiComUmProfessor() : super(Dio());
 
+  static final _joao = Professor(
+    id: 'professor-1',
+    fotoUrl: null,
+    nome: 'João Treinador',
+    cpf: '52998224725',
+    telefone: '11988887777',
+    email: null,
+    especialidade: 'Musculação',
+    observacoes: null,
+    status: UserStatus.ativo,
+    createdAt: DateTime(2026, 1, 1),
+  );
+
   @override
   Future<PaginatedResult<Professor>> list({
     String? search,
@@ -78,26 +91,11 @@ class _ProfessoresApiComUmProfessor extends ProfessoresApi {
     int page = 1,
     int pageSize = 20,
   }) async {
-    return PaginatedResult(
-      items: [
-        Professor(
-          id: 'professor-1',
-          fotoUrl: null,
-          nome: 'João Treinador',
-          cpf: '52998224725',
-          telefone: '11988887777',
-          email: null,
-          especialidade: 'Musculação',
-          observacoes: null,
-          status: UserStatus.ativo,
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-      total: 1,
-      page: 1,
-      pageSize: pageSize,
-    );
+    return PaginatedResult(items: [_joao], total: 1, page: 1, pageSize: pageSize);
   }
+
+  @override
+  Future<Professor> get(String id) async => _joao;
 }
 
 /// Fake de AlunosApi.list() — usado só pra abrir a lista antes de navegar
@@ -108,6 +106,21 @@ class _AlunosApiVazia extends AlunosApi {
 
   @override
   Future<PaginatedResult<Aluno>> list({
+    String? search,
+    UserStatus? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
+  }
+}
+
+/// Fake de ProfessoresApi.list() — mesmo raciocínio de _AlunosApiVazia.
+class _ProfessoresApiVazia extends ProfessoresApi {
+  _ProfessoresApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<Professor>> list({
     String? search,
     UserStatus? status,
     int page = 1,
@@ -333,6 +346,99 @@ void main() {
 
     expect(find.text('João Treinador'), findsOneWidget);
     expect(find.textContaining('Musculação'), findsOneWidget);
+  });
+
+  testWidgets('painel de detalhe do professor mostra dados reais e seções futuras como placeholder', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        professoresApiProvider.overrideWithValue(_ProfessoresApiComUmProfessor()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Professores').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('João Treinador'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('João Treinador'), findsWidgets);
+    expect(find.text('Ativo'), findsOneWidget);
+    expect(find.text('Editar'), findsOneWidget);
+    expect(find.text('Remover'), findsOneWidget);
+
+    // Seções futuras diferentes das de Aluno — Turmas/Financeiro fazem
+    // sentido pra um professor, Avaliações/Frequência/Treinos não.
+    expect(find.text('Turmas'), findsOneWidget);
+    expect(find.text('SPRINT 9 · AGENDA'), findsOneWidget);
+    expect(find.text('SPRINT 6 · FINANCEIRO'), findsOneWidget);
+  });
+
+  testWidgets('formulário de professor mostra erro de validação em todos os campos obrigatórios', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        professoresApiProvider.overrideWithValue(_ProfessoresApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Professores').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Novo professor'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Novo professor'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pump();
+
+    expect(find.text('Informe o nome'), findsOneWidget);
+    expect(find.text('Informe o CPF'), findsOneWidget);
+    expect(find.text('Informe o telefone'), findsOneWidget);
   });
 
   testWidgets('formulário de aluno mostra erro de validação em todos os campos obrigatórios', (

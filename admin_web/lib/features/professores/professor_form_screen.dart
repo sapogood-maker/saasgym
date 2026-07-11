@@ -1,22 +1,25 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
 
-/// Criação (`professorId == null`) e edição (`professorId != null`) de
-/// professor — mesmo formulário nos dois casos.
+/// Formulário de professor (criar/editar) — Sprint 3, reescrita 1:1 do
+/// padrão consolidado por `AlunoFormScreen` (Sprint 2, MS4): seções em
+/// `AppCard`, campos em `AppFormRow`, erro de campo no próprio campo,
+/// `AppFormErrorBanner` pra erro de salvar. Professor não tem data de
+/// nascimento/sexo/endereço — por isso não usa `AppDateField`/`AppSelect`
+/// aqui, mesmo eles fazendo parte do Design System: reuso é do padrão de
+/// composição, não de "usar todo componente que existe".
 class ProfessorFormScreen extends ConsumerStatefulWidget {
   const ProfessorFormScreen({this.professorId, super.key});
 
   final String? professorId;
 
   @override
-  ConsumerState<ProfessorFormScreen> createState() =>
-      _ProfessorFormScreenState();
+  ConsumerState<ProfessorFormScreen> createState() => _ProfessorFormScreenState();
 }
 
 class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
@@ -30,10 +33,12 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
 
   Uint8List? _fotoBytes;
   String? _fotoNomeArquivo;
+  String? _fotoUrlExistente;
 
   bool _carregando = false;
   bool _salvando = false;
-  String? _erro;
+  String? _erroCarregamento;
+  String? _erroSalvar;
 
   bool get _editando => widget.professorId != null;
 
@@ -46,19 +51,21 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
   }
 
   Future<void> _carregarProfessor() async {
-    setState(() => _carregando = true);
+    setState(() {
+      _carregando = true;
+      _erroCarregamento = null;
+    });
     try {
-      final professor = await ref
-          .read(professoresApiProvider)
-          .get(widget.professorId!);
+      final professor = await ref.read(professoresApiProvider).get(widget.professorId!);
       _nomeController.text = professor.nome;
       _cpfController.text = professor.cpf;
       _telefoneController.text = professor.telefone;
       _emailController.text = professor.email ?? '';
       _especialidadeController.text = professor.especialidade ?? '';
       _observacoesController.text = professor.observacoes ?? '';
+      _fotoUrlExistente = professor.fotoUrl;
     } on DioException catch (e) {
-      _erro = _mensagemErro(e);
+      _erroCarregamento = _mensagemErro(e);
     } finally {
       if (mounted) {
         setState(() => _carregando = false);
@@ -77,44 +84,24 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
     super.dispose();
   }
 
-  Future<void> _escolherFoto() async {
-    final resultado = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    final arquivos = resultado?.files ?? const [];
-    if (arquivos.isEmpty || arquivos.first.bytes == null) {
-      return;
-    }
-    setState(() {
-      _fotoBytes = arquivos.first.bytes;
-      _fotoNomeArquivo = arquivos.first.name;
-    });
-  }
-
   Map<String, dynamic> _construirPayload() {
     return {
       'nome': _nomeController.text.trim(),
       'cpf': _cpfController.text.trim(),
       'telefone': _telefoneController.text.trim(),
-      if (_emailController.text.trim().isNotEmpty)
-        'email': _emailController.text.trim(),
-      if (_especialidadeController.text.trim().isNotEmpty)
-        'especialidade': _especialidadeController.text.trim(),
-      if (_observacoesController.text.trim().isNotEmpty)
-        'observacoes': _observacoesController.text.trim(),
+      if (_emailController.text.trim().isNotEmpty) 'email': _emailController.text.trim(),
+      if (_especialidadeController.text.trim().isNotEmpty) 'especialidade': _especialidadeController.text.trim(),
+      if (_observacoesController.text.trim().isNotEmpty) 'observacoes': _observacoesController.text.trim(),
     };
   }
 
   Future<void> _salvar() async {
+    setState(() => _erroSalvar = null);
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() {
-      _salvando = true;
-      _erro = null;
-    });
+    setState(() => _salvando = true);
 
     try {
       final professoresApi = ref.read(professoresApiProvider);
@@ -124,18 +111,17 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
           : await professoresApi.create(payload);
 
       if (_fotoBytes != null) {
-        await professoresApi.uploadFoto(
-          professor.id,
-          bytes: _fotoBytes!,
-          filename: _fotoNomeArquivo!,
-        );
+        await professoresApi.uploadFoto(professor.id, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
       }
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_editando ? 'Professor atualizado com sucesso.' : 'Professor cadastrado com sucesso.')),
+        );
         context.pop(true);
       }
     } on DioException catch (e) {
-      setState(() => _erro = _mensagemErro(e));
+      setState(() => _erroSalvar = _mensagemErro(e));
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -145,133 +131,143 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    // Rota fora do ShellRoute (tela cheia, sem sidebar/header) — precisa do
+    // próprio Scaffold, mesma regra do AlunoFormScreen.
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_editando ? 'Editar professor' : 'Novo professor'),
-      ),
-      body: _carregando
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 48,
-                              backgroundImage: _fotoBytes != null
-                                  ? MemoryImage(_fotoBytes!)
-                                  : null,
-                              child: _fotoBytes == null
-                                  ? const Icon(Icons.person, size: 40)
-                                  : null,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: IconButton.filled(
-                                icon: const Icon(Icons.camera_alt, size: 18),
-                                onPressed: _escolherFoto,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _nomeController,
-                        decoration: const InputDecoration(labelText: 'Nome'),
-                        validator: (v) => (v == null || v.trim().length < 2)
-                            ? 'Informe o nome'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _cpfController,
-                              decoration: const InputDecoration(
-                                labelText: 'CPF',
-                                hintText: '000.000.000-00',
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Informe o CPF'
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _telefoneController,
-                              decoration: const InputDecoration(
-                                labelText: 'Telefone',
-                              ),
-                              validator: (v) =>
-                                  (v == null || v.trim().length < 8)
-                                  ? 'Informe o telefone'
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail (opcional)',
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _especialidadeController,
-                        decoration: const InputDecoration(
-                          labelText: 'Especialidade (opcional)',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _observacoesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Observações (opcional)',
-                        ),
-                        maxLines: 3,
-                      ),
-                      if (_erro != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          _erro!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _salvando ? null : _salvar,
-                        child: _salvando
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Salvar'),
-                      ),
-                    ],
-                  ),
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _editando ? 'Editar professor' : 'Novo professor',
+                style: AppTypography.displayLarge.copyWith(color: colors.text),
               ),
+              const SizedBox(height: AppSpacing.xl),
+              if (_erroCarregamento != null)
+                EmptyState(
+                  icon: AppIcons.alert,
+                  title: _erroCarregamento!,
+                  actionLabel: 'Tentar novamente',
+                  onAction: _carregarProfessor,
+                )
+              else if (_carregando)
+                const _ProfessorFormSkeleton()
+              else
+                _formulario(colors),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _formulario(AppColorScheme colors) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: AppAvatarPicker(
+              imageBytes: _fotoBytes,
+              imageUrl: _fotoUrlExistente,
+              radius: 48,
+              onPicked: (pick) => setState(() {
+                _fotoBytes = pick.bytes;
+                _fotoNomeArquivo = pick.filename;
+              }),
             ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppCard(
+            title: 'Dados pessoais',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Nome',
+                    controller: _nomeController,
+                    validator: (v) => (v == null || v.trim().length < 2) ? 'Informe o nome' : null,
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'CPF',
+                    hintText: '000.000.000-00',
+                    controller: _cpfController,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o CPF' : null,
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Contato',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Telefone',
+                    controller: _telefoneController,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => (v == null || v.trim().length < 8) ? 'Informe o telefone' : null,
+                  ),
+                  AppTextField(label: 'E-mail (opcional)', controller: _emailController, keyboardType: TextInputType.emailAddress),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Dados profissionais',
+            child: AppFormRow(children: [
+              AppTextField(label: 'Especialidade (opcional)', controller: _especialidadeController),
+            ]),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Observações',
+            child: AppTextField(label: 'Observações (opcional)', controller: _observacoesController, maxLines: 3),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          if (_erroSalvar != null) ...[
+            AppFormErrorBanner(_erroSalvar!),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Row(
+            children: [
+              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : () => context.pop(false)),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfessorFormSkeleton extends StatelessWidget {
+  const _ProfessorFormSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        LoadingSkeleton(width: 96, height: 96, shape: AppSkeletonShape.circle),
+        SizedBox(height: AppSpacing.xl),
+        AppCard(title: 'Dados pessoais', loading: true),
+        SizedBox(height: AppSpacing.lg),
+        AppCard(title: 'Contato', loading: true),
+      ],
     );
   }
 }
