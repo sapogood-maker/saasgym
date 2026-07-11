@@ -20,8 +20,7 @@ class StudentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'SaaSGym — Portal do Aluno',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.darkPremium(),
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
     );

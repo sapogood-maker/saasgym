@@ -13,8 +13,19 @@ dependencies:
     sdk: flutter
   flutter_riverpod: ^2.6.1
   dio: ^5.7.0
+  lucide_icons_flutter: ^3.1.15
+  file_picker: ^8.1.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+flutter:
+  fonts:
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-Variable.ttf
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Variable.ttf

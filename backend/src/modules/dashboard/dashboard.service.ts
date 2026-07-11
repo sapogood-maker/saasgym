@@ -10,6 +10,10 @@ interface AniversarianteRow {
   dataNascimento: Date;
 }
 
+// Limite de itens do "Alunos novos" do Dashboard — lista curta e acionável,
+// não uma paginação completa (essa já existe na tela de Alunos).
+const ALUNOS_NOVOS_LIMITE = 5;
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -30,6 +34,7 @@ export class DashboardService {
       novosAlunosMes,
       aniversariantes,
       usuariosDoSistema,
+      alunosNovos,
     ] = await Promise.all([
       this.prisma.forTenant().aluno.count({ where: { deletedAt: null } }),
       this.prisma.forTenant().aluno.count({ where: { deletedAt: null, status: UserStatus.ATIVO } }),
@@ -39,6 +44,12 @@ export class DashboardService {
         .aluno.count({ where: { deletedAt: null, createdAt: { gte: inicioMes } } }),
       this.buscarAniversariantesDoMes(academiaId),
       this.prisma.forTenant().user.count(),
+      this.prisma.forTenant().aluno.findMany({
+        where: { deletedAt: null, createdAt: { gte: inicioMes } },
+        orderBy: { createdAt: 'desc' },
+        take: ALUNOS_NOVOS_LIMITE,
+        select: { id: true, nome: true, createdAt: true },
+      }),
     ]);
 
     return {
@@ -48,6 +59,7 @@ export class DashboardService {
       novosAlunosMes,
       aniversariantes,
       usuariosDoSistema,
+      alunosNovos,
     };
   }
 

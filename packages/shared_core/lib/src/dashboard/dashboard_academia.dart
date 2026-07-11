@@ -19,6 +19,24 @@ class Aniversariante {
   final DateTime dataNascimento;
 }
 
+/// Aluno cadastrado recentemente (mesmo recorte de `novosAlunosMes`,
+/// limitado a 5) — vira lista acionável no Dashboard.
+class AlunoRecente {
+  const AlunoRecente({required this.id, required this.nome, required this.createdAt});
+
+  factory AlunoRecente.fromJson(Map<String, dynamic> json) {
+    return AlunoRecente(
+      id: json['id'] as String,
+      nome: json['nome'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
+  final String id;
+  final String nome;
+  final DateTime createdAt;
+}
+
 /// Visão geral da própria academia — `GET /dashboard`. Ainda sem
 /// Agenda/Financeiro (chegam em sprints futuros).
 class DashboardAcademia {
@@ -29,6 +47,7 @@ class DashboardAcademia {
     required this.novosAlunosMes,
     required this.aniversariantes,
     required this.usuariosDoSistema,
+    required this.alunosNovos,
   });
 
   factory DashboardAcademia.fromJson(Map<String, dynamic> json) {
@@ -42,6 +61,10 @@ class DashboardAcademia {
           .map(Aniversariante.fromJson)
           .toList(),
       usuariosDoSistema: json['usuariosDoSistema'] as int,
+      alunosNovos: (json['alunosNovos'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(AlunoRecente.fromJson)
+          .toList(),
     );
   }
 
@@ -51,4 +74,5 @@ class DashboardAcademia {
   final int novosAlunosMes;
   final List<Aniversariante> aniversariantes;
   final int usuariosDoSistema;
+  final List<AlunoRecente> alunosNovos;
 }

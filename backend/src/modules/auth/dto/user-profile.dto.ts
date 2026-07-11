@@ -16,6 +16,12 @@ export class UserProfileDto {
 
   @ApiProperty({ nullable: true, description: 'null apenas para SYSTEM_ADMIN' })
   academiaId!: string | null;
+
+  @ApiProperty({ nullable: true, description: 'null apenas para SYSTEM_ADMIN' })
+  academiaNome!: string | null;
+
+  @ApiProperty({ nullable: true, description: 'null apenas para SYSTEM_ADMIN' })
+  planoNome!: string | null;
 }
 
 export class LoginResponseDto {

@@ -13,8 +13,7 @@ class AdminApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'SaaSGym Admin',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.darkPremium(),
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

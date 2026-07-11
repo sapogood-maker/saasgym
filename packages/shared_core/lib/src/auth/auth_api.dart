@@ -30,6 +30,8 @@ class AuthApi {
         email: userJson['email'] as String,
         role: Role.fromJson(userJson['role'] as String),
         academiaId: userJson['academiaId'] as String?,
+        academiaNome: userJson['academiaNome'] as String?,
+        planoNome: userJson['planoNome'] as String?,
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../features/alunos/aluno_form_screen.dart';
 import '../features/alunos/alunos_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/design_system_gallery/design_system_gallery_screen.dart';
 import '../features/perfil/perfil_screen.dart';
 import '../features/professores/professor_detail_screen.dart';
 import '../features/professores/professor_form_screen.dart';
@@ -49,6 +50,14 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // Catálogo interno do Design System — fora do ShellRoute de propósito
+      // (tela cheia própria, sem sidebar/topbar). Link visível na navegação
+      // só em kDebugMode a partir do MS4/MS5 (sidebar rica); por ora,
+      // acessível direto pela URL.
+      GoRoute(
+        path: '/design-system',
+        builder: (context, state) => const DesignSystemGalleryScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [

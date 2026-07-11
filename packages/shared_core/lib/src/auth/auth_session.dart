@@ -10,6 +10,8 @@ class AuthenticatedUser {
     required this.email,
     required this.role,
     this.academiaId,
+    this.academiaNome,
+    this.planoNome,
   });
 
   final String id;
@@ -19,6 +21,12 @@ class AuthenticatedUser {
 
   /// Nulo apenas para [Role.systemAdmin].
   final String? academiaId;
+
+  /// Nulo apenas para [Role.systemAdmin].
+  final String? academiaNome;
+
+  /// Nulo apenas para [Role.systemAdmin].
+  final String? planoNome;
 }
 
 /// Estado de sessão: access token (em memória, nunca persistido) + usuário atual.

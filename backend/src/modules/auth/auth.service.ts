@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { AuditAction, User, UserStatus } from '@prisma/client';
+import { Academia, AuditAction, PlanoSaas, User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
 import { isAcademiaStatusBlocking } from '../../common/academia/academia-status.util';
@@ -41,7 +41,7 @@ export class AuthService {
   async login(email: string, password: string, meta: RequestMetadata): Promise<LoginResult> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { academia: true },
+      include: { academia: { include: { planoSaas: true } } },
     });
     const passwordMatches = await bcrypt.compare(password, user?.senhaHash ?? DUMMY_PASSWORD_HASH);
 
@@ -111,7 +111,10 @@ export class AuthService {
   }
 
   async me(userId: string): Promise<UserProfileDto> {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      include: { academia: { include: { planoSaas: true } } },
+    });
     return this.toProfile(user);
   }
 
@@ -265,13 +268,17 @@ export class AuthService {
     await this.auditService.record({ action: AuditAction.SESSION_REVOKED, userId, academiaId });
   }
 
-  private toProfile(user: User): UserProfileDto {
+  private toProfile(
+    user: User & { academia?: (Academia & { planoSaas?: PlanoSaas | null }) | null },
+  ): UserProfileDto {
     return {
       id: user.id,
       nome: user.nome,
       email: user.email,
       role: user.role,
       academiaId: user.academiaId,
+      academiaNome: user.academia?.nome ?? null,
+      planoNome: user.academia?.planoSaas?.nome ?? null,
     };
   }
 }
