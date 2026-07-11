@@ -1,15 +1,18 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
-/// Criação (`alunoId == null`) e edição (`alunoId != null`) de aluno — mesmo
-/// formulário nos dois casos, já que os campos coincidem.
+/// Formulário de aluno (criar/editar) — referência de composição para todo
+/// formulário futuro do sistema (Professores, Planos, Turmas, Academias):
+/// seções em `AppCard` (Dados pessoais/Contato/Endereço/Observações/Ações),
+/// campos em `AppFormRow` (2 colunas no desktop, 1 no mobile), erro de
+/// campo no próprio campo (chassi do MS1), erro de salvar num
+/// `AppFormErrorBanner` — nunca `SnackBar` pra nenhum dos dois.
 class AlunoFormScreen extends ConsumerStatefulWidget {
   const AlunoFormScreen({this.alunoId, super.key});
 
@@ -37,10 +40,12 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
   Sexo? _sexo;
   Uint8List? _fotoBytes;
   String? _fotoNomeArquivo;
+  String? _fotoUrlExistente;
 
   bool _carregando = false;
   bool _salvando = false;
-  String? _erro;
+  String? _erroCarregamento;
+  String? _erroSalvar;
 
   bool get _editando => widget.alunoId != null;
 
@@ -53,7 +58,10 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
   }
 
   Future<void> _carregarAluno() async {
-    setState(() => _carregando = true);
+    setState(() {
+      _carregando = true;
+      _erroCarregamento = null;
+    });
     try {
       final aluno = await ref.read(alunosApiProvider).get(widget.alunoId!);
       _nomeController.text = aluno.nome;
@@ -69,8 +77,9 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
       _observacoesController.text = aluno.observacoes ?? '';
       _dataNascimento = aluno.dataNascimento;
       _sexo = aluno.sexo;
+      _fotoUrlExistente = aluno.fotoUrl;
     } on DioException catch (e) {
-      _erro = _mensagemErro(e);
+      _erroCarregamento = _mensagemErro(e);
     } finally {
       if (mounted) {
         setState(() => _carregando = false);
@@ -94,34 +103,6 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
     super.dispose();
   }
 
-  Future<void> _escolherDataNascimento() async {
-    final agora = DateTime.now();
-    final selecionada = await showDatePicker(
-      context: context,
-      initialDate: _dataNascimento ?? DateTime(agora.year - 20),
-      firstDate: DateTime(1900),
-      lastDate: agora,
-    );
-    if (selecionada != null) {
-      setState(() => _dataNascimento = selecionada);
-    }
-  }
-
-  Future<void> _escolherFoto() async {
-    final resultado = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    final arquivos = resultado?.files ?? const [];
-    if (arquivos.isEmpty || arquivos.first.bytes == null) {
-      return;
-    }
-    setState(() {
-      _fotoBytes = arquivos.first.bytes;
-      _fotoNomeArquivo = arquivos.first.name;
-    });
-  }
-
   Map<String, dynamic> _construirPayload() {
     return {
       'nome': _nomeController.text.trim(),
@@ -130,36 +111,23 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
       'dataNascimento': DateFormat('yyyy-MM-dd').format(_dataNascimento!),
       'sexo': _sexo!.wireValue,
       'telefone': _telefoneController.text.trim(),
-      if (_whatsappController.text.trim().isNotEmpty)
-        'whatsapp': _whatsappController.text.trim(),
-      if (_emailController.text.trim().isNotEmpty)
-        'email': _emailController.text.trim(),
-      if (_enderecoController.text.trim().isNotEmpty)
-        'endereco': _enderecoController.text.trim(),
-      if (_cidadeController.text.trim().isNotEmpty)
-        'cidade': _cidadeController.text.trim(),
-      if (_estadoController.text.trim().isNotEmpty)
-        'estado': _estadoController.text.trim(),
-      if (_cepController.text.trim().isNotEmpty)
-        'cep': _cepController.text.trim(),
-      if (_observacoesController.text.trim().isNotEmpty)
-        'observacoes': _observacoesController.text.trim(),
+      if (_whatsappController.text.trim().isNotEmpty) 'whatsapp': _whatsappController.text.trim(),
+      if (_emailController.text.trim().isNotEmpty) 'email': _emailController.text.trim(),
+      if (_enderecoController.text.trim().isNotEmpty) 'endereco': _enderecoController.text.trim(),
+      if (_cidadeController.text.trim().isNotEmpty) 'cidade': _cidadeController.text.trim(),
+      if (_estadoController.text.trim().isNotEmpty) 'estado': _estadoController.text.trim(),
+      if (_cepController.text.trim().isNotEmpty) 'cep': _cepController.text.trim(),
+      if (_observacoesController.text.trim().isNotEmpty) 'observacoes': _observacoesController.text.trim(),
     };
   }
 
   Future<void> _salvar() async {
+    setState(() => _erroSalvar = null);
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    if (_dataNascimento == null || _sexo == null) {
-      setState(() => _erro = 'Preencha data de nascimento e sexo.');
-      return;
-    }
 
-    setState(() {
-      _salvando = true;
-      _erro = null;
-    });
+    setState(() => _salvando = true);
 
     try {
       final alunosApi = ref.read(alunosApiProvider);
@@ -169,18 +137,17 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
           : await alunosApi.create(payload);
 
       if (_fotoBytes != null) {
-        await alunosApi.uploadFoto(
-          aluno.id,
-          bytes: _fotoBytes!,
-          filename: _fotoNomeArquivo!,
-        );
+        await alunosApi.uploadFoto(aluno.id, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
       }
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_editando ? 'Aluno atualizado com sucesso.' : 'Aluno cadastrado com sucesso.')),
+        );
         context.pop(true);
       }
     } on DioException catch (e) {
-      setState(() => _erro = _mensagemErro(e));
+      setState(() => _erroSalvar = _mensagemErro(e));
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -190,233 +157,181 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    // Rota fora do ShellRoute (tela cheia, sem sidebar/header) — precisa do
+    // próprio Scaffold, diferente de telas como Dashboard/Alunos que vivem
+    // dentro do AppShell e herdam o Scaffold dele.
     return Scaffold(
-      appBar: AppBar(title: Text(_editando ? 'Editar aluno' : 'Novo aluno')),
-      body: _carregando
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 48,
-                              backgroundImage: _fotoBytes != null
-                                  ? MemoryImage(_fotoBytes!)
-                                  : null,
-                              child: _fotoBytes == null
-                                  ? const Icon(Icons.person, size: 40)
-                                  : null,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: IconButton.filled(
-                                icon: const Icon(Icons.camera_alt, size: 18),
-                                onPressed: _escolherFoto,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _nomeController,
-                        decoration: const InputDecoration(labelText: 'Nome'),
-                        validator: (v) => (v == null || v.trim().length < 2)
-                            ? 'Informe o nome'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _cpfController,
-                              decoration: const InputDecoration(
-                                labelText: 'CPF',
-                                hintText: '000.000.000-00',
-                              ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Informe o CPF'
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _rgController,
-                              decoration: const InputDecoration(
-                                labelText: 'RG (opcional)',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: _escolherDataNascimento,
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Data de nascimento',
-                                ),
-                                child: Text(
-                                  _dataNascimento != null
-                                      ? DateFormat(
-                                          'dd/MM/yyyy',
-                                        ).format(_dataNascimento!)
-                                      : 'Selecionar',
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<Sexo>(
-                              initialValue: _sexo,
-                              decoration: const InputDecoration(
-                                labelText: 'Sexo',
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: Sexo.masculino,
-                                  child: Text('Masculino'),
-                                ),
-                                DropdownMenuItem(
-                                  value: Sexo.feminino,
-                                  child: Text('Feminino'),
-                                ),
-                                DropdownMenuItem(
-                                  value: Sexo.outro,
-                                  child: Text('Outro'),
-                                ),
-                              ],
-                              onChanged: (v) => setState(() => _sexo = v),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _telefoneController,
-                              decoration: const InputDecoration(
-                                labelText: 'Telefone',
-                              ),
-                              validator: (v) =>
-                                  (v == null || v.trim().length < 8)
-                                  ? 'Informe o telefone'
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _whatsappController,
-                              decoration: const InputDecoration(
-                                labelText: 'WhatsApp (opcional)',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail (opcional)',
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _enderecoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Endereço (opcional)',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _cidadeController,
-                              decoration: const InputDecoration(
-                                labelText: 'Cidade (opcional)',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _estadoController,
-                              decoration: const InputDecoration(
-                                labelText: 'Estado (opcional)',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _cepController,
-                              decoration: const InputDecoration(
-                                labelText: 'CEP (opcional)',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _observacoesController,
-                        decoration: const InputDecoration(
-                          labelText: 'Observações (opcional)',
-                        ),
-                        maxLines: 3,
-                      ),
-                      if (_erro != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          _erro!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _salvando ? null : _salvar,
-                        child: _salvando
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Salvar'),
-                      ),
-                    ],
-                  ),
-                ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _editando ? 'Editar aluno' : 'Novo aluno',
+                style: AppTypography.displayLarge.copyWith(color: colors.text),
               ),
+              const SizedBox(height: AppSpacing.xl),
+              if (_erroCarregamento != null)
+                EmptyState(
+                  icon: AppIcons.alert,
+                  title: _erroCarregamento!,
+                  actionLabel: 'Tentar novamente',
+                  onAction: _carregarAluno,
+                )
+              else if (_carregando)
+                const _AlunoFormSkeleton()
+              else
+                _formulario(colors),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _formulario(AppColorScheme colors) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: AppAvatarPicker(
+              imageBytes: _fotoBytes,
+              imageUrl: _fotoUrlExistente,
+              radius: 48,
+              onPicked: (pick) => setState(() {
+                _fotoBytes = pick.bytes;
+                _fotoNomeArquivo = pick.filename;
+              }),
             ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppCard(
+            title: 'Dados pessoais',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Nome',
+                    controller: _nomeController,
+                    validator: (v) => (v == null || v.trim().length < 2) ? 'Informe o nome' : null,
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'CPF',
+                    hintText: '000.000.000-00',
+                    controller: _cpfController,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o CPF' : null,
+                  ),
+                  AppTextField(label: 'RG (opcional)', controller: _rgController),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppDateField(
+                    label: 'Data de nascimento',
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                    value: _dataNascimento,
+                    onChanged: (v) => setState(() => _dataNascimento = v),
+                    validator: (v) => v == null ? 'Informe a data de nascimento' : null,
+                  ),
+                  AppSelect<Sexo?>(
+                    label: 'Sexo',
+                    value: _sexo,
+                    options: const [
+                      AppSelectOption(value: Sexo.masculino, label: 'Masculino'),
+                      AppSelectOption(value: Sexo.feminino, label: 'Feminino'),
+                      AppSelectOption(value: Sexo.outro, label: 'Outro'),
+                    ],
+                    onChanged: (v) => setState(() => _sexo = v),
+                    validator: (v) => v == null ? 'Informe o sexo' : null,
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Contato',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Telefone',
+                    controller: _telefoneController,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => (v == null || v.trim().length < 8) ? 'Informe o telefone' : null,
+                  ),
+                  AppTextField(label: 'WhatsApp (opcional)', controller: _whatsappController, keyboardType: TextInputType.phone),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(label: 'E-mail (opcional)', controller: _emailController, keyboardType: TextInputType.emailAddress),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Endereço',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppTextField(label: 'Endereço (opcional)', controller: _enderecoController),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(label: 'Cidade (opcional)', controller: _cidadeController),
+                  AppTextField(label: 'Estado (opcional)', controller: _estadoController),
+                  AppTextField(label: 'CEP (opcional)', controller: _cepController),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            title: 'Observações',
+            child: AppTextField(label: 'Observações (opcional)', controller: _observacoesController, maxLines: 3),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          if (_erroSalvar != null) ...[
+            AppFormErrorBanner(_erroSalvar!),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          Row(
+            children: [
+              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : () => context.pop(false)),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlunoFormSkeleton extends StatelessWidget {
+  const _AlunoFormSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        LoadingSkeleton(width: 96, height: 96, shape: AppSkeletonShape.circle),
+        SizedBox(height: AppSpacing.xl),
+        AppCard(title: 'Dados pessoais', loading: true),
+        SizedBox(height: AppSpacing.lg),
+        AppCard(title: 'Contato', loading: true),
+      ],
     );
   }
 }

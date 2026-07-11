@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_core/shared_core.dart';
@@ -32,6 +33,26 @@ class _AdapterSemRede implements HttpClientAdapter {
 class _AlunosApiComUmAluno extends AlunosApi {
   _AlunosApiComUmAluno() : super(Dio());
 
+  static final _maria = Aluno(
+    id: 'aluno-1',
+    fotoUrl: null,
+    nome: 'Maria Teste',
+    cpf: '11144477735',
+    rg: null,
+    dataNascimento: DateTime(2000, 1, 31),
+    sexo: Sexo.feminino,
+    telefone: '11999999999',
+    whatsapp: null,
+    email: null,
+    endereco: null,
+    cidade: null,
+    estado: null,
+    cep: null,
+    observacoes: null,
+    status: UserStatus.ativo,
+    createdAt: DateTime(2026, 1, 1),
+  );
+
   @override
   Future<PaginatedResult<Aluno>> list({
     String? search,
@@ -39,33 +60,11 @@ class _AlunosApiComUmAluno extends AlunosApi {
     int page = 1,
     int pageSize = 20,
   }) async {
-    return PaginatedResult(
-      items: [
-        Aluno(
-          id: 'aluno-1',
-          fotoUrl: null,
-          nome: 'Maria Teste',
-          cpf: '11144477735',
-          rg: null,
-          dataNascimento: DateTime(2000, 1, 31),
-          sexo: Sexo.feminino,
-          telefone: '11999999999',
-          whatsapp: null,
-          email: null,
-          endereco: null,
-          cidade: null,
-          estado: null,
-          cep: null,
-          observacoes: null,
-          status: UserStatus.ativo,
-          createdAt: DateTime(2026, 1, 1),
-        ),
-      ],
-      total: 1,
-      page: 1,
-      pageSize: pageSize,
-    );
+    return PaginatedResult(items: [_maria], total: 1, page: 1, pageSize: pageSize);
   }
+
+  @override
+  Future<Aluno> get(String id) async => _maria;
 }
 
 /// Fake de ProfessoresApi.list() — mesmo raciocínio de _AlunosApiComUmAluno.
@@ -98,6 +97,23 @@ class _ProfessoresApiComUmProfessor extends ProfessoresApi {
       page: 1,
       pageSize: pageSize,
     );
+  }
+}
+
+/// Fake de AlunosApi.list() — usado só pra abrir a lista antes de navegar
+/// pro formulário; retorna vazio de propósito (o teste não depende do
+/// conteúdo da lista, só precisa que a tela carregue sem erro).
+class _AlunosApiVazia extends AlunosApi {
+  _AlunosApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<Aluno>> list({
+    String? search,
+    UserStatus? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
   }
 }
 
@@ -147,6 +163,53 @@ void main() {
     expect(find.text('Não foi possível carregar o dashboard.'), findsOneWidget);
   });
 
+  testWidgets('no mobile, tocar num item da sidebar fecha o Drawer', (
+    WidgetTester tester,
+  ) async {
+    // Regressão: onDestinationSelected só navegava (context.go), sem
+    // fechar o Drawer — a tela nova ficava escondida atrás dele até o
+    // usuário tocar fora manualmente.
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsOneWidget);
+
+    await tester.tap(find.text('Alunos').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Drawer), findsNothing);
+  });
+
   testWidgets('lista de alunos renderiza os itens retornados pela API', (
     WidgetTester tester,
   ) async {
@@ -182,6 +245,55 @@ void main() {
 
     expect(find.text('Maria Teste'), findsOneWidget);
     expect(find.textContaining('11144477735'), findsOneWidget);
+  });
+
+  testWidgets('painel de detalhe do aluno mostra dados reais e seções futuras como placeholder', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        alunosApiProvider.overrideWithValue(_AlunosApiComUmAluno()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alunos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Maria Teste'));
+    await tester.pumpAndSettle();
+
+    // Dados reais carregados via AlunosApi.get() — aparece no cabeçalho do
+    // painel e de novo como valor em "Dados pessoais".
+    expect(find.text('Maria Teste'), findsWidgets);
+    expect(find.text('Ativo'), findsOneWidget);
+    expect(find.text('Editar'), findsOneWidget);
+    expect(find.text('Remover'), findsOneWidget);
+
+    // Seções ainda sem funcionalidade aparecem como placeholder com a tag
+    // da sprint responsável — nunca dado inventado.
+    expect(find.text('Matrículas'), findsOneWidget);
+    expect(find.text('SPRINT 5 · MATRÍCULAS'), findsOneWidget);
+    expect(find.text('SPRINT 6 · FINANCEIRO'), findsOneWidget);
   });
 
   testWidgets('lista de professores renderiza os itens retornados pela API', (
@@ -221,5 +333,56 @@ void main() {
 
     expect(find.text('João Treinador'), findsOneWidget);
     expect(find.textContaining('Musculação'), findsOneWidget);
+  });
+
+  testWidgets('formulário de aluno mostra erro de validação em todos os campos obrigatórios', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        alunosApiProvider.overrideWithValue(_AlunosApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alunos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Novo aluno'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Novo aluno'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pump();
+
+    // Mesmo padrão de erro em todos os campos obrigatórios — nome, CPF,
+    // telefone (AppTextField), data de nascimento (AppDateField) e sexo
+    // (AppSelect) usam o mesmo chassi de validação do MS1.
+    expect(find.text('Informe o nome'), findsOneWidget);
+    expect(find.text('Informe o CPF'), findsOneWidget);
+    expect(find.text('Informe o telefone'), findsOneWidget);
+    expect(find.text('Informe a data de nascimento'), findsOneWidget);
+    expect(find.text('Informe o sexo'), findsOneWidget);
   });
 }

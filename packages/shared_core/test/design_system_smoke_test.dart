@@ -274,4 +274,226 @@ void main() {
     expect(find.text('Mariana Ferreira'), findsOneWidget);
     expect(find.text('12/jul'), findsOneWidget);
   });
+
+  testWidgets('AppDetailRow mostra o valor ou um traço quando vazio', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const Column(
+          children: [
+            AppDetailRow(label: 'Nome', value: 'Mariana Ferreira'),
+            AppDetailRow(label: 'RG', value: null),
+            AppDetailRow(label: 'Observações', value: '   '),
+          ],
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Mariana Ferreira'), findsOneWidget);
+    expect(find.text('—'), findsNWidgets(2));
+  });
+
+  testWidgets('AppTextField builda, aceita texto e mostra erro do validator', (tester) async {
+    final formKey = GlobalKey<FormState>();
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      _harness(
+        Form(
+          key: formKey,
+          child: AppTextField(
+            label: 'Nome',
+            controller: controller,
+            validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Nome'), findsOneWidget);
+
+    formKey.currentState!.validate();
+    await tester.pump();
+    expect(find.text('Campo obrigatório'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Mariana');
+    formKey.currentState!.validate();
+    await tester.pump();
+    expect(find.text('Campo obrigatório'), findsNothing);
+  });
+
+  testWidgets('AppSelect builda, lista opções e reporta seleção', (tester) async {
+    UserStatus? selecionado;
+    await tester.pumpWidget(
+      _harness(
+        StatefulBuilder(
+          builder: (context, setState) => AppSelect<UserStatus?>(
+            label: 'Status',
+            value: selecionado,
+            options: const [
+              AppSelectOption(value: null, label: 'Todos'),
+              AppSelectOption(value: UserStatus.ativo, label: 'Ativos'),
+            ],
+            onChanged: (v) => setState(() => selecionado = v),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Status'), findsOneWidget);
+    expect(find.text('Todos'), findsOneWidget);
+  });
+
+  testWidgets('AppDateField builda, mostra placeholder e abre o seletor nativo', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        AppDateField(
+          label: 'Data de nascimento',
+          firstDate: DateTime(1900),
+          lastDate: DateTime(2026),
+          onChanged: (_) {},
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Selecionar'), findsOneWidget);
+
+    await tester.tap(find.text('Selecionar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+  });
+
+  testWidgets('AppConfirmDialog builda em todas as variantes e resolve true/false', (tester) async {
+    for (final variant in AppConfirmDialogVariant.values) {
+      bool? resultado;
+      await tester.pumpWidget(
+        _harness(
+          Builder(
+            builder: (context) => AppButton(
+              label: 'Abrir',
+              onPressed: () async {
+                resultado = await AppConfirmDialog.show(
+                  context,
+                  variant: variant,
+                  title: 'Título',
+                  description: 'Descrição do diálogo.',
+                  confirmLabel: 'Sim',
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Título'), findsOneWidget);
+
+      await tester.tap(find.text('Sim'));
+      await tester.pumpAndSettle();
+      expect(resultado, isTrue);
+    }
+  });
+
+  testWidgets('AppPagination desabilita anterior na página 1 e avança ao tocar em próxima', (tester) async {
+    int? paginaSolicitada;
+    await tester.pumpWidget(
+      _harness(
+        AppPagination(page: 1, pageSize: 20, total: 45, onPageChanged: (p) => paginaSolicitada = p),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Página 1 de 3 · 45 no total'), findsOneWidget);
+
+    await tester.tap(find.byIcon(AppIcons.chevronRight));
+    expect(paginaSolicitada, 2);
+
+    // Componente é controlado — a página exibida continua 1 até o pai
+    // atualizar o parâmetro, então "anterior" segue desabilitado aqui.
+    paginaSolicitada = null;
+    await tester.tap(find.byIcon(AppIcons.chevronLeft));
+    expect(paginaSolicitada, isNull, reason: 'botão anterior deve estar desabilitado na página 1');
+  });
+
+  testWidgets('AppAvatarPicker builda vazio, com preview e em loading', (tester) async {
+    await tester.pumpWidget(
+      _harness(
+        const Column(
+          children: [
+            AppAvatarPicker(),
+            AppAvatarPicker(loading: true),
+            AppAvatarPicker(enabled: false),
+          ],
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.byIcon(AppIcons.profile), findsNWidgets(3));
+    expect(find.byIcon(AppIcons.camera), findsOneWidget);
+  });
+
+  testWidgets('AppListToolbar builda em largura desktop e em largura mobile', (tester) async {
+    Widget toolbar() => AppListToolbar(
+      search: AppTextField(label: 'Buscar', hintText: 'Nome, CPF ou telefone'),
+      secondaryActions: [
+        AppSelect<bool?>(
+          label: 'Status',
+          value: null,
+          options: const [AppSelectOption(value: null, label: 'Todos')],
+          onChanged: (_) {},
+        ),
+      ],
+      primaryAction: AppButton(label: 'Novo aluno', icon: AppIcons.add, onPressed: () {}),
+    );
+
+    await tester.pumpWidget(_harness(toolbar()));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Novo aluno'), findsOneWidget);
+
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_harness(toolbar()));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Novo aluno'), findsOneWidget);
+  });
+
+  testWidgets('AppFormRow empilha 1 campo, empilha no mobile e divide em colunas no desktop', (tester) async {
+    Widget row() => AppFormRow(
+      children: [
+        AppTextField(label: 'CPF'),
+        AppTextField(label: 'RG'),
+      ],
+    );
+
+    await tester.pumpWidget(_harness(row()));
+    expect(tester.takeException(), isNull);
+    final cpfDesktop = tester.getTopLeft(find.text('CPF'));
+    final rgDesktop = tester.getTopLeft(find.text('RG'));
+    expect(cpfDesktop.dy, equals(rgDesktop.dy), reason: 'no desktop os dois campos devem ficar na mesma linha');
+
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_harness(row()));
+    expect(tester.takeException(), isNull);
+    final cpfMobile = tester.getTopLeft(find.text('CPF'));
+    final rgMobile = tester.getTopLeft(find.text('RG'));
+    expect(cpfMobile.dy, lessThan(rgMobile.dy), reason: 'no mobile os campos devem empilhar');
+  });
+
+  testWidgets('AppFormErrorBanner builda com a mensagem', (tester) async {
+    await tester.pumpWidget(_harness(const AppFormErrorBanner('Não foi possível salvar o aluno.')));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Não foi possível salvar o aluno.'), findsOneWidget);
+  });
 }

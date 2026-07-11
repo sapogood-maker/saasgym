@@ -4,9 +4,9 @@ import 'package:shared_core/shared_core.dart';
 /// Documentação viva do Design System — não é uma tela de produto, é
 /// catálogo interno pra validar visualmente cada componente antes dele
 /// "entrar" no sistema. Organizada por categoria (Colors, Typography,
-/// Buttons, Cards, Lists, Chips, Empty States, Skeleton, Navigation,
-/// Motion); categorias sem componente construído ainda (Inputs, Forms,
-/// Tables) não aparecem — entram quando o componente correspondente for
+/// Buttons, Cards, Lists, Chips, Empty States, Skeleton, Inputs, Forms,
+/// Dialogs, Navigation, Motion); categorias sem componente construído ainda
+/// (Tables) não aparecem — entram quando o componente correspondente for
 /// implementado, não antes.
 ///
 /// Regra do projeto (vigente desde a Sprint 1, MS3): todo componente novo
@@ -48,6 +48,12 @@ class DesignSystemGalleryScreen extends StatelessWidget {
               const _Section(title: 'Empty States', child: _EmptyStatesShowcase()),
               const SizedBox(height: AppSpacing.xxl),
               const _Section(title: 'Skeleton', child: _SkeletonShowcase()),
+              const SizedBox(height: AppSpacing.xxl),
+              const _Section(title: 'Inputs', child: _InputsShowcase()),
+              const SizedBox(height: AppSpacing.xxl),
+              const _Section(title: 'Forms', child: _FormsShowcase()),
+              const SizedBox(height: AppSpacing.xxl),
+              const _Section(title: 'Dialogs', child: _DialogsShowcase()),
               const SizedBox(height: AppSpacing.xxl),
               const _Section(title: 'Navigation', child: _NavigationShowcase()),
               const SizedBox(height: AppSpacing.xxl),
@@ -249,29 +255,85 @@ class _CardsShowcase extends StatelessWidget {
   }
 }
 
-class _ListsShowcase extends StatelessWidget {
+class _ListsShowcase extends StatefulWidget {
   const _ListsShowcase();
+
+  @override
+  State<_ListsShowcase> createState() => _ListsShowcaseState();
+}
+
+class _ListsShowcaseState extends State<_ListsShowcase> {
+  UserStatus? _status;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return SizedBox(
-      width: 360,
-      child: AppCard(
-        title: 'AppListTile',
-        child: Column(
-          children: [
-            const AppListTile(title: 'Mariana Ferreira', subtitle: 'Plano Trimestral', leadingText: 'MF', trailing: AppBadge('12/jul')),
-            Divider(color: colors.borderSoft, height: 1),
-            AppListTile(
-              title: 'Rodrigo Castro',
-              subtitle: 'Cadastrado há 2 dias',
-              leadingText: 'RC',
-              onTap: () {},
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('AppListToolbar', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        AppListToolbar(
+          search: AppTextField(label: 'Buscar', hintText: 'Nome, CPF ou telefone', prefixIcon: AppIcons.search),
+          secondaryActions: [
+            SizedBox(
+              width: 160,
+              child: AppSelect<UserStatus?>(
+                label: 'Status',
+                value: _status,
+                options: const [
+                  AppSelectOption(value: null, label: 'Todos'),
+                  AppSelectOption(value: UserStatus.ativo, label: 'Ativos'),
+                ],
+                onChanged: (v) => setState(() => _status = v),
+              ),
             ),
           ],
+          primaryAction: AppButton(label: 'Novo aluno', icon: AppIcons.add, onPressed: () {}),
         ),
-      ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('AppListTile', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: 360,
+          child: AppCard(
+            title: 'AppListTile',
+            child: Column(
+              children: [
+                const AppListTile(title: 'Mariana Ferreira', subtitle: 'Plano Trimestral', leadingText: 'MF', trailing: AppBadge('12/jul')),
+                Divider(color: colors.borderSoft, height: 1),
+                AppListTile(
+                  title: 'Rodrigo Castro',
+                  subtitle: 'Cadastrado há 2 dias',
+                  leadingText: 'RC',
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('AppDetailRow (leitura, dentro de AppFormRow)', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: 480,
+          child: AppCard(
+            title: 'Dados pessoais',
+            child: Column(
+              children: [
+                AppFormRow(children: [
+                  AppDetailRow(label: 'Nome', value: 'Mariana Ferreira'),
+                  AppDetailRow(label: 'CPF', value: '111.444.777-35'),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppDetailRow(label: 'RG (opcional, vazio)', value: null),
+                ]),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -362,6 +424,136 @@ class _SkeletonShowcase extends StatelessWidget {
   }
 }
 
+class _InputsShowcase extends StatefulWidget {
+  const _InputsShowcase();
+
+  @override
+  State<_InputsShowcase> createState() => _InputsShowcaseState();
+}
+
+class _InputsShowcaseState extends State<_InputsShowcase> {
+  UserStatus? _status;
+  DateTime? _data;
+  final _cpfComErroController = TextEditingController(text: '111.444.777');
+
+  @override
+  void dispose() {
+    _cpfComErroController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.lg,
+      runSpacing: AppSpacing.lg,
+      crossAxisAlignment: WrapCrossAlignment.start,
+      children: [
+        SizedBox(
+          width: 260,
+          child: AppTextField(label: 'Nome', hintText: 'Nome completo', prefixIcon: AppIcons.students),
+        ),
+        SizedBox(
+          width: 260,
+          child: AppTextField(
+            label: 'CPF',
+            controller: _cpfComErroController,
+            validator: (_) => 'CPF inválido',
+            autovalidateMode: AutovalidateMode.always,
+          ),
+        ),
+        SizedBox(
+          width: 260,
+          child: AppSelect<UserStatus?>(
+            label: 'Status',
+            value: _status,
+            options: const [
+              AppSelectOption(value: null, label: 'Todos'),
+              AppSelectOption(value: UserStatus.ativo, label: 'Ativos'),
+              AppSelectOption(value: UserStatus.inativo, label: 'Inativos'),
+            ],
+            onChanged: (v) => setState(() => _status = v),
+          ),
+        ),
+        SizedBox(
+          width: 260,
+          child: AppDateField(
+            label: 'Data de nascimento',
+            firstDate: DateTime(1900),
+            lastDate: DateTime.now(),
+            value: _data,
+            onChanged: (v) => setState(() => _data = v),
+          ),
+        ),
+        Column(
+          children: [
+            const AppAvatarPicker(),
+            const SizedBox(height: AppSpacing.xs),
+            Text('AppAvatarPicker', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FormsShowcase extends StatelessWidget {
+  const _FormsShowcase();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('AppFormRow (2 campos — vira 1 coluna no mobile)', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: 500,
+          child: AppFormRow(
+            children: [
+              AppTextField(label: 'CPF', hintText: '000.000.000-00'),
+              AppTextField(label: 'RG (opcional)'),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('AppFormErrorBanner', style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(
+          width: 500,
+          child: AppFormErrorBanner('Já existe um aluno com este CPF nesta academia.'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DialogsShowcase extends StatelessWidget {
+  const _DialogsShowcase();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        for (final variant in AppConfirmDialogVariant.values)
+          AppButton(
+            label: variant.name,
+            variant: AppButtonVariant.secondary,
+            onPressed: () => AppConfirmDialog.show(
+              context,
+              variant: variant,
+              title: 'Remover aluno',
+              description: 'Remover Mariana Ferreira? O cadastro fica inativo e preservado.',
+              confirmLabel: 'Remover',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _NavigationShowcase extends StatelessWidget {
   const _NavigationShowcase();
 
@@ -417,6 +609,10 @@ class _NavigationShowcase extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: AppSpacing.xl),
+        Text('AppPagination', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        AppPagination(page: 2, pageSize: 20, total: 128, onPageChanged: (_) {}),
       ],
     );
   }
