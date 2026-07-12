@@ -70,6 +70,10 @@ enum AuditAction {
   PLANO_UPDATED
   PLANO_STATUS_CHANGED
   PLANO_DELETED
+  MATRICULA_CREATED
+  MATRICULA_UPDATED
+  MATRICULA_STATUS_CHANGED
+  MATRICULA_DELETED
 }
 
 enum ArquivoCategoria {
@@ -90,6 +94,30 @@ enum Periodicidade {
   TRIMESTRAL
   SEMESTRAL
   ANUAL
+}
+
+/// ATIVA cobra e permite frequência. TRANCADA é uma pausa temporária (não
+/// é fim de contrato — volta a ATIVA). CANCELADA é encerramento por
+/// decisão antes do fim da vigência (motivo obrigatório, ver
+/// MotivoCancelamento). ENCERRADA é o fim natural da vigência sem
+/// renovação. Deliberadamente não reaproveita UserStatus — ver
+/// docs/16-modulo-2-matriculas-analise.md, item 2.
+enum MatriculaStatus {
+  ATIVA
+  TRANCADA
+  CANCELADA
+  ENCERRADA
+}
+
+/// Categoria estruturada de cancelamento — permite relatório de churn
+/// agrupável (ex.: "quantos cancelamentos por inadimplência este mês"),
+/// o que um campo de texto livre sozinho não permite. OUTRO exige
+/// motivoCancelamentoDetalhe preenchido (validado no service).
+enum MotivoCancelamento {
+  ALUNO_SOLICITOU
+  INADIMPLENCIA
+  ACADEMIA_CANCELOU
+  OUTRO
 }
 
 /// Tenant: cada academia cliente do SaaS.
@@ -116,6 +144,7 @@ model Academia {
   alunos       Aluno[]
   professores  Professor[]
   planos       Plano[]
+  matriculas   Matricula[]
 
   @@map("academias")
 }
@@ -226,6 +255,8 @@ model Aluno {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  matriculas Matricula[]
+
   @@unique([academiaId, cpf])
   @@index([academiaId])
   @@map("alunos")
@@ -276,19 +307,83 @@ model Plano {
   nome            String
   descricao       String?
   periodicidade   Periodicidade
-  valor           Decimal @db.Decimal(10, 2)
+  valor           Decimal       @db.Decimal(10, 2)
   quantidadeAulas Int?
   ordem           Int?
-  status          UserStatus @default(ATIVO)
+  status          UserStatus    @default(ATIVO)
 
   deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  matriculas Matricula[]
+
   @@unique([academiaId, nome])
   @@index([academiaId])
   @@map("planos")
+}
+
+/// Liga um Aluno a um Plano por um período — o núcleo comercial do ERP,
+/// base para geração de Mensalidade (Financeiro) e elegibilidade de Aula
+/// (Agenda), nenhum dos dois implementado ainda. Tenant-scoped, soft
+/// delete (reservado a erro de cadastro — cancelamento de verdade é
+/// status = CANCELADA, não deletedAt, ver docs/16, item 8).
+///
+/// `valor`/`diaVencimento` são cópias (snapshot) do que foi acordado na
+/// criação — Plano.valor pode mudar depois sem afetar quem já está
+/// matriculado (docs/16, item 1). `planoId` é imutável após a criação:
+/// não existe (nem vai existir) update que troque o plano de uma
+/// matrícula — upgrade/downgrade/renovação são sempre encerrar esta +
+/// criar uma nova (docs/16, item 12). `dataFimPrevista` é calculada uma
+/// vez na criação e nunca muda; `dataFim` é a vigente, empurrada pra
+/// frente quando a matrícula é reativada depois de um trancamento
+/// (docs/16, item 9).
+///
+/// Regra "1 matrícula ATIVA por aluno por vez" é aplicada no
+/// MatriculasService, não como constraint de banco (docs/16, item 4).
+model Matricula {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  alunoId String
+  aluno   Aluno  @relation(fields: [alunoId], references: [id])
+
+  planoId String
+  plano   Plano  @relation(fields: [planoId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  valor         Decimal @db.Decimal(10, 2)
+  diaVencimento Int
+
+  dataInicio      DateTime
+  dataFimPrevista DateTime
+  dataFim         DateTime
+
+  status MatriculaStatus @default(ATIVA)
+
+  trancadoEm        DateTime?
+  trancamentoMotivo String?
+
+  motivoCancelamento        MotivoCancelamento?
+  motivoCancelamentoDetalhe String?
+
+  matriculaAnteriorId String?    @unique
+  matriculaAnterior   Matricula? @relation("Renovacao", fields: [matriculaAnteriorId], references: [id])
+  matriculaRenovada   Matricula? @relation("Renovacao")
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([academiaId])
+  @@index([alunoId])
+  @@index([planoId])
+  @@map("matriculas")
 }
 
 /// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
@@ -311,7 +406,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
+  refreshTokens     RefreshToken[]
+  matriculasCriadas Matricula[]
 
   @@index([academiaId])
   @@map("users")

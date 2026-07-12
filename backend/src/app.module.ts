@@ -10,6 +10,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { AlunosModule } from './modules/alunos/alunos.module';
 import { ProfessoresModule } from './modules/professores/professores.module';
 import { PlanosModule } from './modules/planos/planos.module';
+import { MatriculasModule } from './modules/matriculas/matriculas.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantContextModule } from './common/context/tenant-context.module';
@@ -34,6 +35,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AlunosModule,
     ProfessoresModule,
     PlanosModule,
+    MatriculasModule,
     DashboardModule,
     UsersModule,
   ],
