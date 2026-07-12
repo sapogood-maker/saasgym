@@ -41,9 +41,11 @@ design_system/
 | Navigation | `AppBreadcrumb`, `AppHeader`, `AppSidebar`, `AppPagination` | Navegação do shell; paginação server-side (`page`/`total`/`pageSize`, nunca lista client-side) |
 | Motion | `AppMotion` | Durações (`fast`=120ms, `base`=180ms, `slow`=280ms) e curva padrão de toda transição |
 
-## O padrão de CRUD (definido pela Sprint 2, módulo de Alunos)
+## O padrão de CRUD — convenção oficial do projeto
 
-A partir da Sprint 2, **Alunos é a referência oficial** para todo CRUD futuro. Nenhum módulo novo deve reinventar layout — deve reutilizar esta infraestrutura.
+Definido na Sprint 2 (Alunos) e **validado como convenção oficial ao final do Módulo 1** (2026-07-11): a mesma estrutura (Lista → Formulário → Detalhe, descrita abaixo) foi reaplicada com sucesso em três entidades independentes — Alunos (Sprint 2), Professores (Sprint 3) e Planos (Módulo 1) — sem exigir **nenhum** componente novo do Design System além do que Alunos já havia estabelecido. Isso não é mais "o jeito que Alunos fez as coisas": é o contrato arquitetural que **todo módulo CRUD do produto** (presente e futuro — Matrículas, Financeiro, Agenda, Avaliações Físicas, Frequência, Treinos) deve seguir por padrão. Divergir dele exige uma decisão explícita e justificada, documentada aqui — não é uma opção default.
+
+Nenhum módulo novo deve reinventar layout — deve reutilizar esta infraestrutura.
 
 ### Lista
 
@@ -80,16 +82,14 @@ Referência: `admin_web/lib/features/alunos/aluno_detail_screen.dart`.
 
 As três telas de Professores (`admin_web/lib/features/professores/`) foram implementadas antes da Sprint 1 (Design System) e da Sprint 2 (padrão de CRUD) — usam `Scaffold`/`TextField`/`ListTile`/`AlertDialog` crus do Material padrão, sem nenhum componente do Design System. **O backend, o cliente HTTP (`ProfessoresApi`) e o roteamento (`app_router.dart`) já estão 100% prontos e espelham exatamente Alunos** — a Sprint 3 é puramente uma reescrita de UI reaproveitando a infraestrutura, não um CRUD novo do zero. Nenhuma mudança de modelo, API ou rota é esperada.
 
-### 2. `AlunosApi`/`ProfessoresApi` são estruturalmente idênticas
+### 2. `AlunosApi`/`ProfessoresApi`/`PlanosApi` eram estruturalmente idênticas — resolvido com `CrudApi<T>`
 
-Os dois arquivos (`packages/shared_core/lib/src/{alunos,professores}/*_api.dart`) têm exatamente os mesmos 6 métodos (`list`/`get`/`create`/`update`/`updateStatus`/`remove`/`uploadFoto`) com a mesma assinatura — só o path do endpoint e o tipo do model mudam. Essa duplicação vai se repetir mais 5 vezes (Planos, Turmas, Matrículas, Avaliações, Financeiro) se não for endereçada.
-
-**Proposta para avaliação** (não implementada — decisão de arquitetura, fica para aprovação explícita antes da Sprint 3): extrair uma classe genérica
+**Status: implementado** (Módulo 1, MS2). A 3ª repetição idêntica (Planos) confirmou o gatilho combinado — extraída `packages/shared_core/lib/src/common/crud_api.dart`:
 
 ```dart
 abstract class CrudApi<T> {
-  CrudApi(this._dio, {required this.resourcePath, required this.fromJson});
-  final Dio _dio;
+  CrudApi(this.dio, {required this.resourcePath, required this.fromJson});
+  final Dio dio;
   final String resourcePath;
   final T Function(Map<String, dynamic>) fromJson;
 
@@ -99,19 +99,37 @@ abstract class CrudApi<T> {
   Future<T> update(String id, Map<String, dynamic> dados) async { ... }
   Future<T> updateStatus(String id, UserStatus status, {String? motivo}) async { ... }
   Future<void> remove(String id) async { ... }
-  Future<T> uploadFoto(String id, {required Uint8List bytes, required String filename}) async { ... }
 }
 
 class AlunosApi extends CrudApi<Aluno> {
-  AlunosApi(Dio dio) : super(dio, resourcePath: '/alunos', fromJson: Aluno.fromJson);
+  AlunosApi(super.dio) : super(resourcePath: '/alunos', fromJson: Aluno.fromJson);
+  Future<Aluno> uploadFoto(String id, {required Uint8List bytes, required String filename}) async { ... }
+}
+
+class PlanosApi extends CrudApi<Plano> {
+  PlanosApi(super.dio) : super(resourcePath: '/planos', fromJson: Plano.fromJson);
 }
 ```
 
-Risco de não fazer: 6 módulos × ~75 linhas quase-idênticas = duplicação real de manutenção (um bug de paginação corrigido em um lugar precisa ser lembrado em 6). Risco de fazer: acopla os módulos a uma abstração comum antes de saber se todos os futuros CRUDs realmente cabem no mesmo formato (ex.: Matrículas provavelmente não é um CRUD simples — tem fluxo aluno→plano→pagamento). Recomendação: aplicar a extração **quando Planos (Sprint 4) confirmar que o padrão se repete pela 3ª vez** — duas repetições ainda são baratas de manter à mão; a terceira é o sinal real de abstração madura.
+**`uploadFoto` deliberadamente fora da base** — não é universal (Plano não tem foto, Matrícula não vai ter); cada subclasse que precisa declara o próprio método usando `dio`/`resourcePath` herdados (public, não `_dio` privado — precisam ser acessíveis a subclasses em outro arquivo). Métodos extras de uma única entidade (ex.: `Matricula.renovar`, quando o Módulo 2 chegar) entram do mesmo jeito, como método adicional na subclasse — a base nunca tenta prever tudo.
+
+**`CrudRepository<T>`/`CrudProvider<T>` avaliados e rejeitados** — sem camada de "Repository" em nenhum lugar do projeto hoje (os `*Api` já são a camada de acesso a dado), e `CrudProvider<T>` esconderia a declaração de 1 linha (`final xApiProvider = Provider<XApi>((ref) => XApi(...))`) atrás de uma função genérica sem reduzir duplicação real, só escondendo. Ambos ficam de fora até haver necessidade comprovada — mesmo princípio já aplicado a componente de UI, agora aplicado a camada de dados.
+
+**Princípio permanente: filtros e operações específicas de domínio nunca entram em `CrudApi<T>`.** `renovar` (Matrícula), `listarVencidas` (Matrícula), `listarPorPlano` (Matrícula/Aluno) e qualquer método parecido são declarados na subclasse concreta, do mesmo jeito que `uploadFoto` já é — nunca um parâmetro opcional a mais em `list()` nem um novo método genérico na base. `CrudApi<T>` só cresce se um **novo** método se repetir de forma idêntica em 3 ou mais subclasses (mesmo gatilho de "3ª repetição confirmada" que já validou a criação da própria classe) — até lá, a base fica pequena e estável, e cada entidade é livre para ter a forma que o próprio domínio pedir.
 
 ### 3. Component Gallery tinha lacunas (corrigidas nesta Sprint)
 
 `MetricCard` estava exportado e em uso real (Dashboard) mas não aparecia na Gallery — violava a própria regra do projeto. `AppAvatarPicker` e `AppPagination` só mostravam um estado cada. Todas as seções da Gallery ganharam uma descrição de uma linha (rule nova: "todo componente deve ter uma pequena descrição e demonstrar seus estados"). Corrigido em `admin_web/lib/features/design_system_gallery/design_system_gallery_screen.dart`.
+
+### 4. `AppPagination` tinha overflow em mobile — nunca pego antes (Módulo 1, MS3)
+
+Mesmo padrão de bug de sempre (`Text` de largura variável sem `Flexible`/ellipsis dentro de um `Row`), só que **dentro do próprio Design System**, existindo desde a Sprint 2 sem nunca ter sido testado numa largura estreita de verdade. Corrigido com `Flexible`+ellipsis, teste de regressão adicionado ao smoke test. Lição registrada na memória do projeto: um componente "aprovado" há sprints não está imune a este padrão — vale reconferir sempre que ele aparecer numa tela nova, não só quando é criado.
+
+## Valor monetário — primeira ocorrência, sem componente novo ainda
+
+`Plano.valor` (Módulo 1, MS4) é o primeiro campo monetário do produto. Implementado com `AppTextField` simples (`keyboardType: numberWithOptions(decimal: true)`, aceita vírgula ou ponto, validado e convertido pra `double` só no payload) — **sem** um componente `AppCurrencyField` novo, porque é a 1ª ocorrência, não a 3ª. Financeiro (Módulo 3) é o candidato natural a confirmar a repetição — se `Mensalidade`/`Lancamento` precisarem do mesmo tratamento, aí sim vale extrair um componente, com máscara de entrada e formatação consistente. Mesmo gatilho já usado para `CrudApi<T>`, agora aplicado a componente de input.
+
+**Regra permanente de normalização**: todo valor monetário é normalizado no frontend **antes** de sair pro backend — `_valorController.text.trim().replaceAll(',', '.')` convertido pra `double` no `_construirPayload()`, nunca a string crua do campo. O banco continua usando `Decimal` (`@db.Decimal(10, 2)`, nunca `Float`) como representação oficial em todo model financeiro — `Plano.valor` hoje, `Mensalidade.valor`/`desconto`/`multa` e `Lancamento.valor` quando o Módulo 3 chegar. `PlanosService.toResponse()` já converte `Decimal → number` antes de qualquer resposta HTTP (nunca vaza um `Decimal.js` cru pro cliente) — mesmo contrato vale pra todo campo monetário futuro.
 
 ## Convenção de testes
 
@@ -125,3 +143,8 @@ Risco de não fazer: 6 módulos × ~75 linhas quase-idênticas = duplicação re
 - **Sprint 1** (2026-07-10): fundação do Design System — tokens, tema, `AppButton`/`AppCard`/`AppBadge`/`EmptyState`/`LoadingSkeleton`/`MetricCard`/`AppListTile`, shell de navegação (`AppSidebar`/`AppHeader`/`AppBreadcrumb`), Dashboard operacional.
 - **Sprint 2** (2026-07-11): módulo de Alunos como referência de CRUD — `AppTextField`/`AppSelect`/`AppDateField`, `AppAvatarPicker`, `AppConfirmDialog`, `AppPagination`, `AppListToolbar`, `AppFormRow`, `AppFormErrorBanner`, `AppDetailRow`. Lista, formulário e painel de detalhe consolidados como padrão oficial.
 - **Sprint de Consolidação** (2026-07-11): este documento; correção das lacunas da Component Gallery (`MetricCard`, estados de `AppAvatarPicker`/`AppPagination`); levantamento do débito técnico de Professores e da duplicação `AlunosApi`/`ProfessoresApi`. Nenhuma funcionalidade nova.
+- **Sprint 3** (2026-07-11): módulo de Professores reescrito com o padrão de Alunos — 100% reuso do Design System, zero componente novo, backend/API/rotas já existiam intactos.
+- **Fase 2 — Módulo 1 (Planos), MS2** (2026-07-11): `CrudApi<T>` extraído e adotado por `AlunosApi`/`ProfessoresApi`/`PlanosApi` (3ª repetição confirmada, gatilho combinado atingido). Ver item 2 da seção "Débito técnico" acima.
+- **Fase 2 — Módulo 1 (Planos), MS3** (2026-07-11): `PlanosScreen` (lista), zero componente novo. `AppPagination` corrigida (item 4 da seção "Débito técnico").
+- **Fase 2 — Módulo 1 (Planos), MS4** (2026-07-11): `PlanoFormScreen`, zero componente novo. Primeira entrada monetária do produto (`valor`), sem `AppCurrencyField` — ver seção "Valor monetário" acima.
+- **Fase 2 — Módulo 1 (Planos), MS5** (2026-07-11): `PlanoDetailScreen`, encerrando o Módulo 1 — zero componente novo, mesmo padrão de `AlunoDetailScreen`/`ProfessorDetailScreen` (`AppDetailRow`+`AppFormRow`, `PopScope` propagando `alterado`, `AppConfirmDialog` na remoção). Seções "Alunos matriculados" e "Financeiro" como `EmptyState.comingSoon` com a nova tag `'MÓDULO N'` (substitui `'SPRINT N'` a partir desta fase). Bug real encontrado só no screenshot mobile — `Expanded` aplicado direto na variável `info` reusada num `Column` de altura irrestrita (dentro do `SingleChildScrollView`); corrigido deixando `info` "plana" e envolvendo com `Expanded` só no ponto de uso do `Row` desktop, mesmo padrão de `AlunoDetailScreen`. Com Alunos, Professores e Planos completos, a base de CRUD está consolidada para iniciar Matrículas e Financeiro.

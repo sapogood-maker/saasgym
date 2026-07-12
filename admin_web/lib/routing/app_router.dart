@@ -10,6 +10,9 @@ import '../features/auth/login_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/design_system_gallery/design_system_gallery_screen.dart';
 import '../features/perfil/perfil_screen.dart';
+import '../features/planos/plano_detail_screen.dart';
+import '../features/planos/plano_form_screen.dart';
+import '../features/planos/planos_screen.dart';
 import '../features/professores/professor_detail_screen.dart';
 import '../features/professores/professor_form_screen.dart';
 import '../features/professores/professores_screen.dart';
@@ -74,6 +77,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProfessoresScreen(),
           ),
           GoRoute(
+            path: '/planos',
+            builder: (context, state) => const PlanosScreen(),
+          ),
+          GoRoute(
             path: '/perfil',
             builder: (context, state) => const PerfilScreen(),
           ),
@@ -106,6 +113,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/professores/:id/editar',
         builder: (context, state) =>
             ProfessorFormScreen(professorId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/planos/novo',
+        builder: (context, state) => const PlanoFormScreen(),
+      ),
+      GoRoute(
+        path: '/planos/:id',
+        builder: (context, state) =>
+            PlanoDetailScreen(planoId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/planos/:id/editar',
+        builder: (context, state) =>
+            PlanoFormScreen(planoId: state.pathParameters['id']!),
       ),
     ],
   );

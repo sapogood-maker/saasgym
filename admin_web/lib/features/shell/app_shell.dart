@@ -21,9 +21,12 @@ class AppShell extends ConsumerWidget {
     AppSidebarDestination(label: 'Dashboard', icon: AppIcons.dashboard, path: '/', section: 'Operação'),
     AppSidebarDestination(label: 'Alunos', icon: AppIcons.students, path: '/alunos', section: 'Operação'),
     AppSidebarDestination(label: 'Professores', icon: AppIcons.teachers, path: '/professores', section: 'Operação'),
+    AppSidebarDestination(label: 'Planos', icon: AppIcons.plans, path: '/planos', section: 'Operação'),
     // Ainda sem tela — visíveis e inertes, preparando a navegação para
-    // quando as sprints correspondentes chegarem (Sprint 9/Agenda, Sprint
-    // 6/Financeiro), em vez de aparecerem "do nada" depois.
+    // quando os módulos correspondentes chegarem (Módulo 2/Matrículas,
+    // Módulo 4/Agenda, Módulo 3/Financeiro), em vez de aparecerem "do
+    // nada" depois.
+    AppSidebarDestination(label: 'Matrículas', icon: AppIcons.enrollment, path: '/matriculas', section: 'Operação', enabled: false),
     AppSidebarDestination(label: 'Agenda', icon: AppIcons.calendar, path: '/agenda', section: 'Operação', enabled: false),
     AppSidebarDestination(label: 'Financeiro', icon: AppIcons.finance, path: '/financeiro', section: 'Operação', enabled: false),
     AppSidebarDestination(label: 'Meu perfil', icon: AppIcons.profile, path: '/perfil', section: 'Conta'),

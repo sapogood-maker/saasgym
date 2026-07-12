@@ -5,6 +5,7 @@ import '../alunos/alunos_api.dart';
 import '../auth/auth_api.dart';
 import '../auth/auth_session.dart';
 import '../dashboard/dashboard_api.dart';
+import '../planos/planos_api.dart';
 import '../professores/professores_api.dart';
 import '../users/users_api.dart';
 
@@ -52,4 +53,8 @@ final alunosApiProvider = Provider<AlunosApi>(
 
 final professoresApiProvider = Provider<ProfessoresApi>(
   (ref) => ProfessoresApi(ref.watch(apiClientProvider).dio),
+);
+
+final planosApiProvider = Provider<PlanosApi>(
+  (ref) => PlanosApi(ref.watch(apiClientProvider).dio),
 );

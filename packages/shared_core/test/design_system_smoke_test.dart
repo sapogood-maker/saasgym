@@ -421,6 +421,22 @@ void main() {
     expect(paginaSolicitada, isNull, reason: 'botão anterior deve estar desabilitado na página 1');
   });
 
+  testWidgets('AppPagination não estoura em largura de celular (texto trunca)', (tester) async {
+    // Regressão: o texto "Página X de Y · Z no total" não tinha
+    // Flexible/ellipsis — estourava (RenderFlex overflow) num container
+    // estreito, mesmo padrão de bug já visto em AppButton/AppHeader.
+    await tester.pumpWidget(
+      _harness(
+        SizedBox(
+          width: 220,
+          child: AppPagination(page: 1, pageSize: 20, total: 4523, onPageChanged: (_) {}),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('AppAvatarPicker builda vazio, com preview e em loading', (tester) async {
     await tester.pumpWidget(
       _harness(

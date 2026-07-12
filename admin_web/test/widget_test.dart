@@ -98,6 +98,42 @@ class _ProfessoresApiComUmProfessor extends ProfessoresApi {
   Future<Professor> get(String id) async => _joao;
 }
 
+/// Fake de PlanosApi.list() — mesmo raciocínio de _AlunosApiComUmAluno.
+/// Primeira API construída direto sobre `CrudApi`.
+class _PlanosApiComUmPlano extends PlanosApi {
+  _PlanosApiComUmPlano() : super(Dio());
+
+  static final _musculacao = Plano(
+    id: 'plano-1',
+    nome: 'Plano Musculação',
+    descricao: null,
+    periodicidade: Periodicidade.mensal,
+    valor: 129.9,
+    quantidadeAulas: null,
+    ordem: null,
+    status: UserStatus.ativo,
+    createdAt: DateTime(2026, 1, 1),
+  );
+
+  @override
+  Future<PaginatedResult<Plano>> list({
+    String? search,
+    UserStatus? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return PaginatedResult(
+      items: [_musculacao],
+      total: 1,
+      page: 1,
+      pageSize: pageSize,
+    );
+  }
+
+  @override
+  Future<Plano> get(String id) async => _musculacao;
+}
+
 /// Fake de AlunosApi.list() — usado só pra abrir a lista antes de navegar
 /// pro formulário; retorna vazio de propósito (o teste não depende do
 /// conteúdo da lista, só precisa que a tela carregue sem erro).
@@ -121,6 +157,21 @@ class _ProfessoresApiVazia extends ProfessoresApi {
 
   @override
   Future<PaginatedResult<Professor>> list({
+    String? search,
+    UserStatus? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
+  }
+}
+
+/// Fake de PlanosApi.list() — mesmo raciocínio de _AlunosApiVazia.
+class _PlanosApiVazia extends PlanosApi {
+  _PlanosApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<Plano>> list({
     String? search,
     UserStatus? status,
     int page = 1,
@@ -346,6 +397,139 @@ void main() {
 
     expect(find.text('João Treinador'), findsOneWidget);
     expect(find.textContaining('Musculação'), findsOneWidget);
+  });
+
+  testWidgets('lista de planos renderiza os itens retornados pela API', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        planosApiProvider.overrideWithValue(_PlanosApiComUmPlano()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Planos').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Plano Musculação'), findsOneWidget);
+    expect(find.textContaining('Mensal'), findsOneWidget);
+    expect(find.textContaining('R\$'), findsOneWidget);
+  });
+
+  testWidgets('painel de detalhe do plano mostra dados reais e seções futuras como placeholder', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        planosApiProvider.overrideWithValue(_PlanosApiComUmPlano()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Planos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plano Musculação'));
+    await tester.pumpAndSettle();
+
+    // Dados reais carregados via PlanosApi.get() — aparece no cabeçalho do
+    // painel e de novo como valor em "Dados do plano".
+    expect(find.text('Plano Musculação'), findsWidgets);
+    expect(find.text('Ativo'), findsOneWidget);
+    expect(find.text('Editar'), findsOneWidget);
+    expect(find.text('Remover'), findsOneWidget);
+
+    // Seções ainda sem funcionalidade aparecem como placeholder com a tag
+    // do módulo responsável — nunca dado inventado.
+    expect(find.text('Alunos matriculados'), findsOneWidget);
+    expect(find.text('MÓDULO 2 · MATRÍCULAS'), findsOneWidget);
+    expect(find.text('MÓDULO 3 · FINANCEIRO'), findsOneWidget);
+  });
+
+  testWidgets('formulário de plano mostra erro de validação em todos os campos obrigatórios', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        planosApiProvider.overrideWithValue(_PlanosApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Planos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Novo plano'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Novo plano'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pump();
+
+    expect(find.text('Informe o nome'), findsOneWidget);
+    expect(find.text('Informe a periodicidade'), findsOneWidget);
+    expect(find.text('Informe o valor'), findsOneWidget);
   });
 
   testWidgets('painel de detalhe do professor mostra dados reais e seções futuras como placeholder', (

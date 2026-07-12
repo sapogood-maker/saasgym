@@ -51,9 +51,16 @@ class AppPagination extends StatelessWidget {
           onTap: () => onPageChanged(page - 1),
         ),
         const SizedBox(width: AppSpacing.md),
-        Text(
-          'Página $page de $totalPages · $total no total',
-          style: AppTypography.monoSmall.copyWith(color: colors.textMuted),
+        // Flexible + ellipsis: sem isso, o texto (largura variável conforme
+        // o total) estoura o Row assim que a tela fica estreita — mesmo
+        // padrão de bug já visto em AppButton/AppBreadcrumb/AppHeader.
+        Flexible(
+          child: Text(
+            'Página $page de $totalPages · $total no total',
+            style: AppTypography.monoSmall.copyWith(color: colors.textMuted),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
         ),
         const SizedBox(width: AppSpacing.md),
         _StepButton(
