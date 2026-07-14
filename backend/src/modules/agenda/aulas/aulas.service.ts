@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AulaStatus, AuditAction, Prisma, UserStatus } from '@prisma/client';
+import { AulaAlunoTipo, AulaStatus, AuditAction, Prisma, UserStatus } from '@prisma/client';
 import { calcularDatasCandidatas, formatarDataChave } from './aulas.util';
 import { GerarAulasDto } from './dto/gerar-aulas.dto';
 import { GerarAulasResponseDto } from './dto/gerar-aulas-response.dto';
@@ -16,8 +16,13 @@ import { AuditService } from '../../audit/audit.service';
 
 const aulaInclude = {
   professor: { select: { nome: true } },
-  turma: { select: { nome: true, modalidadeId: true, modalidade: { select: { nome: true } } } },
+  turma: { select: { nome: true, modalidadeId: true, local: true, modalidade: { select: { nome: true } } } },
   _count: { select: { alunos: true } },
+  // Sprint de UX da Agenda (docs/24, item 6): total de reposições por aula
+  // pro resumo operacional. `_count.select` só aceita 1 filtro por relação,
+  // por isso a contagem de REPOSICAO vem de uma 2ª leitura da mesma relação
+  // (`alunos`, filtrada), não de uma consulta separada — mesma ida ao banco.
+  alunos: { where: { tipo: AulaAlunoTipo.REPOSICAO, deletedAt: null }, select: { id: true } },
 } satisfies Prisma.AulaInclude;
 
 type AulaComRelacoes = Prisma.AulaGetPayload<{ include: typeof aulaInclude }>;
@@ -383,6 +388,8 @@ export class AulasService {
       status: aula.status,
       motivoCancelamento: aula.motivoCancelamento,
       totalAlunos: aula._count.alunos,
+      totalReposicoes: aula.alunos.length,
+      local: aula.turma.local,
       createdAt: aula.createdAt,
     };
   }

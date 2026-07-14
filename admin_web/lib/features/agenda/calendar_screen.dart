@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
@@ -55,6 +56,33 @@ DateTime _somenteData(DateTime data) => DateTime(data.year, data.month, data.day
 List<Aula> _aulasNoDia(List<Aula> aulas, DateTime dia) {
   return aulas.where((a) => a.data.year == dia.year && a.data.month == dia.month && a.data.day == dia.day).toList()
     ..sort((a, b) => a.horaInicio.compareTo(b.horaInicio));
+}
+
+/// Sprint de UX da Agenda (docs/24, item 3) — ocupação é sempre **da
+/// ocorrência** (`Aula.totalAlunos`/`capacidadeMaxima`), nunca a vaga
+/// estrutural da Turma (essa continua em `TurmaDetailScreen`, via "Abrir
+/// Turma"). Sem capacidade definida (ilimitada), não há o que colorir.
+AppBadgeTone _tomOcupacao(int totalAlunos, int? capacidadeMaxima) {
+  if (capacidadeMaxima == null || capacidadeMaxima == 0) return AppBadgeTone.neutral;
+  final ocupacao = totalAlunos / capacidadeMaxima;
+  if (ocupacao >= 1) return AppBadgeTone.error;
+  if (ocupacao >= 0.7) return AppBadgeTone.warning;
+  return AppBadgeTone.success;
+}
+
+String _rotuloOcupacao(int totalAlunos, int? capacidadeMaxima) {
+  return capacidadeMaxima != null ? '$totalAlunos/$capacidadeMaxima' : '$totalAlunos aluno(s)';
+}
+
+/// Mesmo parser de `modalidades_screen.dart` (`_corDeHex`) — duplicado de
+/// propósito em vez de extraído pro Design System: são 6 linhas usadas em
+/// 2 telas, não justifica um utilitário compartilhado ainda.
+Color? _corDeHex(String? hex) {
+  if (hex == null || hex.isEmpty) return null;
+  final limpo = hex.replaceFirst('#', '');
+  final valor = int.tryParse(limpo, radix: 16);
+  if (valor == null) return null;
+  return Color(0xFF000000 | valor);
 }
 
 /// Calendário — Módulo 4 (MS7), uma **visão operacional sobre `Aula`**,
@@ -127,6 +155,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     });
   }
 
+  /// Sprint de UX da Agenda (docs/24, item 1) — `_turmas`/`_modalidades` já
+  /// são carregadas pro filtro; reaproveitadas aqui pra derivar, sem
+  /// consulta nova, se uma Aula tem professor substituto (≠ titular da
+  /// Turma) e a cor da Modalidade (identificação visual do chip).
+  Turma? _turmaDe(String turmaId) {
+    for (final turma in _turmas) {
+      if (turma.id == turmaId) return turma;
+    }
+    return null;
+  }
+
+  Color? _corModalidade(String modalidadeId) {
+    for (final modalidade in _modalidades) {
+      if (modalidade.id == modalidadeId) return _corDeHex(modalidade.cor);
+    }
+    return null;
+  }
+
   void _mudarModo(_ModoCalendario modo) {
     setState(() => _modo = modo);
     _carregar();
@@ -154,7 +200,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Future<void> _abrirAcoes(Aula aula) async {
     final alterou = await showDialog<bool>(
       context: context,
-      builder: (_) => _AulaAcoesDialog(aula: aula, professores: _professores),
+      builder: (_) => _AulaAcoesDialog(aula: aula, professores: _professores, turma: _turmaDe(aula.turmaId)),
     );
     if (alterou == true) _carregar();
   }
@@ -234,11 +280,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       onAction: _novaAulaExtra,
                     );
                   }
-                  return switch (_modo) {
-                    _ModoCalendario.dia => _visaoDia(aulas),
-                    _ModoCalendario.semana => _visaoSemana(aulas),
-                    _ModoCalendario.mes => _visaoMes(aulas),
-                  };
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _resumoOperacional(aulas),
+                      const SizedBox(height: AppSpacing.lg),
+                      switch (_modo) {
+                        _ModoCalendario.dia => _visaoDia(aulas),
+                        _ModoCalendario.semana => _visaoSemana(aulas),
+                        _ModoCalendario.mes => _visaoMes(aulas),
+                      },
+                    ],
+                  );
                 },
               ),
             ),
@@ -394,6 +447,36 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  /// Resumo operacional (docs/24, item 6) — sempre sobre o período
+  /// **atualmente visível** (não "hoje" fixo), pra nunca ficar descolado
+  /// do que está na grade abaixo; some rótulo com `_rotuloJanela`, que já
+  /// existe pra cabeçalho de navegação. Tudo calculado sobre a lista de
+  /// Aulas já carregada — nenhuma consulta adicional.
+  Widget _resumoOperacional(List<Aula> aulas) {
+    final colors = context.colors;
+    final totalAlunos = aulas.fold<int>(0, (soma, a) => soma + a.totalAlunos);
+    final cancelamentos = aulas.where((a) => a.status == AulaStatus.cancelada).length;
+    final reposicoes = aulas.fold<int>(0, (soma, a) => soma + a.totalReposicoes);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Resumo · $_rotuloJanela', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            MetricCard(label: 'Aulas', value: '${aulas.length}', width: 150),
+            MetricCard(label: 'Alunos previstos', value: '$totalAlunos', width: 150),
+            MetricCard(label: 'Cancelamentos', value: '$cancelamentos', width: 150),
+            MetricCard(label: 'Reposições', value: '$reposicoes', width: 150),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _visaoDia(List<Aula> aulas) {
     final colors = context.colors;
     final doDia = _aulasNoDia(aulas, _dataReferencia);
@@ -409,10 +492,21 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       children: [
         for (var i = 0; i < doDia.length; i++) ...[
           if (i > 0) Divider(color: colors.borderSoft, height: 1),
-          _AulaListRow(aula: doDia[i], onTap: () => _abrirAcoes(doDia[i])),
+          _AulaListRow(
+            aula: doDia[i],
+            onTap: () => _abrirAcoes(doDia[i]),
+            substituto: _ehSubstituto(doDia[i]),
+          ),
         ],
       ],
     );
+  }
+
+  /// Verdadeiro só quando a Turma é conhecida e o professor da ocorrência
+  /// diverge do titular — nunca assume substituição por falta de dado.
+  bool _ehSubstituto(Aula aula) {
+    final turma = _turmaDe(aula.turmaId);
+    return turma != null && turma.professorId != aula.professorId;
   }
 
   Widget _visaoSemana(List<Aula> aulas) {
@@ -431,6 +525,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               destacado: dias[i] == hoje,
               aulas: _aulasNoDia(aulas, dias[i]),
               onTapAula: _abrirAcoes,
+              ehSubstituto: _ehSubstituto,
+              resolveCorModalidade: _corModalidade,
             ),
           ],
         ],
@@ -449,6 +545,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 destacado: dias[i] == hoje,
                 aulas: _aulasNoDia(aulas, dias[i]),
                 onTapAula: _abrirAcoes,
+                ehSubstituto: _ehSubstituto,
+                resolveCorModalidade: _corModalidade,
                 compacta: true,
               ),
             ),
@@ -552,10 +650,14 @@ class _StepButton extends StatelessWidget {
 }
 
 class _AulaListRow extends StatelessWidget {
-  const _AulaListRow({required this.aula, required this.onTap});
+  const _AulaListRow({required this.aula, required this.onTap, required this.substituto});
 
   final Aula aula;
   final VoidCallback onTap;
+
+  /// Verdadeiro quando o professor da ocorrência diverge do titular da
+  /// Turma (docs/24, item 1) — calculado no cliente, sem consulta nova.
+  final bool substituto;
 
   @override
   Widget build(BuildContext context) {
@@ -581,19 +683,34 @@ class _AulaListRow extends StatelessWidget {
                   children: [
                     Text(
                       '${aula.horaInicio} · ${aula.turmaNome}',
-                      style: AppTypography.titleMedium.copyWith(color: colors.text),
+                      style: AppTypography.titleMedium.copyWith(
+                        color: colors.text,
+                        decoration: agendada ? null : TextDecoration.lineThrough,
+                      ),
                     ),
                     Text(
-                      '${aula.modalidadeNome} · ${aula.professorNome} · ${aula.totalAlunos} aluno(s)',
+                      aula.local != null
+                          ? '${aula.modalidadeNome} · ${aula.professorNome} · ${aula.local}'
+                          : '${aula.modalidadeNome} · ${aula.professorNome}',
                       style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              AppBadge(
-                agendada ? 'Agendada' : 'Cancelada',
-                tone: agendada ? AppBadgeTone.success : AppBadgeTone.neutral,
+              Wrap(
+                spacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (substituto) const AppBadge('Substituto', tone: AppBadgeTone.warning),
+                  if (!agendada)
+                    const AppBadge('Cancelada', tone: AppBadgeTone.error)
+                  else
+                    AppBadge(
+                      _rotuloOcupacao(aula.totalAlunos, aula.capacidadeMaxima),
+                      tone: _tomOcupacao(aula.totalAlunos, aula.capacidadeMaxima),
+                    ),
+                ],
               ),
             ],
           ),
@@ -611,6 +728,8 @@ class _ColunaDia extends StatelessWidget {
     required this.destacado,
     required this.aulas,
     required this.onTapAula,
+    required this.ehSubstituto,
+    required this.resolveCorModalidade,
     this.compacta = false,
   });
 
@@ -618,6 +737,8 @@ class _ColunaDia extends StatelessWidget {
   final bool destacado;
   final List<Aula> aulas;
   final ValueChanged<Aula> onTapAula;
+  final bool Function(Aula aula) ehSubstituto;
+  final Color? Function(String modalidadeId) resolveCorModalidade;
   final bool compacta;
 
   @override
@@ -658,7 +779,13 @@ class _ColunaDia extends StatelessWidget {
             for (final aula in aulas)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: _ChipAula(aula: aula, onTap: () => onTapAula(aula)),
+                child: _ChipAula(
+                  aula: aula,
+                  onTap: () => onTapAula(aula),
+                  detalhado: true,
+                  corModalidade: resolveCorModalidade(aula.modalidadeId),
+                  substituto: ehSubstituto(aula),
+                ),
               ),
         ],
       ),
@@ -734,10 +861,36 @@ class _CelulaMes extends StatelessWidget {
 }
 
 class _ChipAula extends StatelessWidget {
-  const _ChipAula({required this.aula, required this.onTap});
+  const _ChipAula({
+    required this.aula,
+    required this.onTap,
+    this.detalhado = false,
+    this.corModalidade,
+    this.substituto = false,
+  });
 
   final Aula aula;
   final VoidCallback onTap;
+
+  /// Semana mostra professor/ocupação/substituição; Mês (`_CelulaMes`)
+  /// continua minimalista de propósito (docs/23/24 — "Mês é estratégico",
+  /// leitura densa por célula piora mais do que ajuda no planejamento).
+  final bool detalhado;
+
+  /// Identificação visual da Modalidade (docs/24, item 1) — cor já
+  /// carregada em `_modalidades`, sem consulta nova.
+  final Color? corModalidade;
+
+  /// Professor da ocorrência diverge do titular da Turma — calculado no
+  /// cliente (docs/24, item 1).
+  final bool substituto;
+
+  Color _corDoTom(AppColorScheme colors, AppBadgeTone tom) => switch (tom) {
+    AppBadgeTone.success => colors.success,
+    AppBadgeTone.warning => colors.warning,
+    AppBadgeTone.error => colors.error,
+    _ => colors.textMuted,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -751,17 +904,44 @@ class _ChipAula extends StatelessWidget {
         decoration: BoxDecoration(
           color: agendada ? colors.successWash : colors.cardRaised,
           borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: corModalidade != null
+              ? Border(left: BorderSide(color: corModalidade!, width: 3))
+              : null,
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
-          child: Text(
-            '${aula.horaInicio} ${aula.turmaNome}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.bodySmall.copyWith(
-              color: agendada ? colors.success : colors.textMuted,
-              decoration: agendada ? null : TextDecoration.lineThrough,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${aula.horaInicio} ${aula.turmaNome}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodySmall.copyWith(
+                  color: agendada ? colors.success : colors.textMuted,
+                  decoration: agendada ? null : TextDecoration.lineThrough,
+                ),
+              ),
+              if (detalhado)
+                Text(
+                  !agendada
+                      ? 'Cancelada'
+                      : substituto
+                      ? '${aula.professorNome} · substituto'
+                      : '${aula.professorNome} · ${_rotuloOcupacao(aula.totalAlunos, aula.capacidadeMaxima)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodySmall.copyWith(
+                    fontSize: 10,
+                    color: !agendada
+                        ? colors.textFaint
+                        : substituto
+                        ? colors.warning
+                        : _corDoTom(colors, _tomOcupacao(aula.totalAlunos, aula.capacidadeMaxima)),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -783,10 +963,15 @@ bool _aulaRealizada(Aula aula) {
 /// `_AcoesRecorrenciaDialog`. Nenhuma tela de detalhe própria (docs/18,
 /// "Calendário"): tudo aqui.
 class _AulaAcoesDialog extends ConsumerStatefulWidget {
-  const _AulaAcoesDialog({required this.aula, required this.professores});
+  const _AulaAcoesDialog({required this.aula, required this.professores, required this.turma});
 
   final Aula aula;
   final List<Professor> professores;
+
+  /// Nulo só se a Turma não estiver entre as ativas já carregadas pro
+  /// filtro (caso raro) — "Abrir Turma" e o indicador de substituto ficam
+  /// escondidos nesse caso, em vez de assumir dado que não se tem certeza.
+  final Turma? turma;
 
   @override
   ConsumerState<_AulaAcoesDialog> createState() => _AulaAcoesDialogState();
@@ -943,8 +1128,29 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
   List<Widget> _menu(AppColorScheme colors) {
     final aula = widget.aula;
     final agendada = aula.status == AulaStatus.agendada;
+    final substituto = widget.turma != null && widget.turma!.professorId != aula.professorId;
 
     return [
+      // Sprint de UX da Agenda (docs/24, item 4) — indicadores mais claros:
+      // status/ocupação/substituição viram badges coloridas logo no topo,
+      // em vez de só texto simples mais abaixo.
+      Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          AppBadge(
+            agendada ? 'Agendada' : 'Cancelada',
+            tone: agendada ? AppBadgeTone.success : AppBadgeTone.error,
+          ),
+          if (agendada)
+            AppBadge(
+              _rotuloOcupacao(aula.totalAlunos, aula.capacidadeMaxima),
+              tone: _tomOcupacao(aula.totalAlunos, aula.capacidadeMaxima),
+            ),
+          if (substituto) const AppBadge('Substituto', tone: AppBadgeTone.warning),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.md),
       AppFormRow(children: [
         AppDetailRow(label: 'Modalidade', value: aula.modalidadeNome),
         AppDetailRow(label: 'Professor', value: aula.professorNome),
@@ -957,11 +1163,10 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
           value: aula.capacidadeMaxima != null ? '${aula.capacidadeMaxima}' : 'Ilimitada',
         ),
       ]),
-      const SizedBox(height: AppSpacing.md),
-      AppFormRow(children: [
-        AppDetailRow(label: 'Alunos inscritos', value: '${aula.totalAlunos}'),
-        AppDetailRow(label: 'Status', value: agendada ? 'Agendada' : 'Cancelada'),
-      ]),
+      if (aula.local != null) ...[
+        const SizedBox(height: AppSpacing.md),
+        AppDetailRow(label: 'Local', value: aula.local),
+      ],
       if (!agendada && aula.motivoCancelamento != null) ...[
         const SizedBox(height: AppSpacing.md),
         AppDetailRow(label: 'Motivo do cancelamento', value: aula.motivoCancelamento),
@@ -971,6 +1176,17 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
         spacing: AppSpacing.sm,
         runSpacing: AppSpacing.sm,
         children: [
+          if (widget.turma != null)
+            AppButton(
+              label: 'Abrir Turma',
+              icon: AppIcons.turmas,
+              variant: AppButtonVariant.ghost,
+              onPressed: () {
+                final turmaId = widget.turma!.id;
+                Navigator.of(context).pop(false);
+                context.go('/agenda/turmas/$turmaId');
+              },
+            ),
           if (agendada) ...[
             AppButton(
               label: 'Definir substituto',

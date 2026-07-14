@@ -47,6 +47,12 @@ export class AulaResponseDto {
   @ApiProperty({ description: 'Quantidade de AulaAluno vinculados a esta aula' })
   totalAlunos!: number;
 
+  @ApiProperty({ description: 'Quantidade de AulaAluno com tipo = REPOSICAO nesta aula' })
+  totalReposicoes!: number;
+
+  @ApiProperty({ nullable: true, description: 'Local/sala da Turma (Turma.local, texto livre)' })
+  local!: string | null;
+
   @ApiProperty()
   createdAt!: Date;
 }

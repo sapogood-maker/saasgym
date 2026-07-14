@@ -25,6 +25,8 @@ class Aula {
     required this.status,
     required this.motivoCancelamento,
     required this.totalAlunos,
+    required this.totalReposicoes,
+    required this.local,
     required this.createdAt,
   });
 
@@ -45,6 +47,8 @@ class Aula {
       status: AulaStatus.fromJson(json['status'] as String),
       motivoCancelamento: json['motivoCancelamento'] as String?,
       totalAlunos: json['totalAlunos'] as int,
+      totalReposicoes: json['totalReposicoes'] as int,
+      local: json['local'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
@@ -72,5 +76,15 @@ class Aula {
   final AulaStatus status;
   final String? motivoCancelamento;
   final int totalAlunos;
+
+  /// Quantos de `totalAlunos` são reposição (Sprint de UX da Agenda,
+  /// docs/24) — pro resumo operacional, nunca pra decisão de vaga
+  /// estrutural (essa continua sendo de `Turma`, não de `Aula`).
+  final int totalReposicoes;
+
+  /// Snapshot de `Turma.local` (texto livre, sala/espaço) — nulo quando a
+  /// Turma não define um local.
+  final String? local;
+
   final DateTime createdAt;
 }

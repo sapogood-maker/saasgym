@@ -5,6 +5,8 @@ import request from 'supertest';
 import { createTestApp } from './utils/create-test-app';
 import {
   createAcademiaFixture,
+  createAlunoFixture,
+  createMatriculaFixture,
   createModalidadeFixture,
   createPlanoFixture,
   createProfessorFixture,
@@ -37,7 +39,7 @@ describe('Aulas Calendario (e2e)', () => {
 
   /// Academia + token + turma + 1 recorrência SEMANAL + 1 Aula já gerada
   /// (segunda-feira 03/08/2026) — pronto pra cancelar/substituir.
-  async function cenarioComAula(nomeAcademia: string) {
+  async function cenarioComAula(nomeAcademia: string, local?: string) {
     const academia = await createAcademiaFixture(prisma, { nome: nomeAcademia });
     const { token, userId } = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
     const modalidade = await createModalidadeFixture(prisma, academia.id);
@@ -46,7 +48,7 @@ describe('Aulas Calendario (e2e)', () => {
     const turma = await request(app.getHttpServer())
       .post('/api/agenda/turmas')
       .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'Turma Calendário', modalidadeId: modalidade.id, professorId: professor.id })
+      .send({ nome: 'Turma Calendário', modalidadeId: modalidade.id, professorId: professor.id, local })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -329,6 +331,47 @@ describe('Aulas Calendario (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
       expect(porStatusAgendada.body.items.some((a: { id: string }) => a.id === aula.id)).toBe(false);
+    });
+  });
+
+  /// Sprint de UX da Agenda (docs/24, item 6) — `totalReposicoes` e `local`
+  /// no `AulaResponseDto`, pro resumo operacional e pro chip da Semana.
+  describe('Campos novos — totalReposicoes e local', () => {
+    it('totalReposicoes conta só AulaAluno com tipo REPOSICAO; local reflete Turma.local', async () => {
+      const { academia, token, turma, aula } = await cenarioComAula(
+        'Academia Campos Novos Calendario E2E',
+        'Tatame',
+      );
+      const aluno1 = await createAlunoFixture(prisma, academia.id);
+      const aluno2 = await createAlunoFixture(prisma, academia.id);
+
+      await prisma.aulaAluno.create({
+        data: { academiaId: academia.id, aulaId: aula.id, alunoId: aluno1.id, tipo: 'MATRICULADO' },
+      });
+      await prisma.aulaAluno.create({
+        data: { academiaId: academia.id, aulaId: aula.id, alunoId: aluno2.id, tipo: 'REPOSICAO' },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/agenda/aulas?turmaId=${turma.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const aulaAtualizada = res.body.items.find((a: { id: string }) => a.id === aula.id);
+      expect(aulaAtualizada.totalAlunos).toBe(2);
+      expect(aulaAtualizada.totalReposicoes).toBe(1);
+      expect(aulaAtualizada.local).toBe('Tatame');
+    });
+
+    it('local vem nulo quando a Turma não tem local definido', async () => {
+      const { token, turma } = await cenarioComAula('Academia Sem Local Calendario E2E');
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/agenda/aulas?turmaId=${turma.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.items[0].local).toBeNull();
     });
   });
 
