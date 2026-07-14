@@ -22,13 +22,13 @@ class AppShell extends ConsumerWidget {
     AppSidebarDestination(label: 'Alunos', icon: AppIcons.students, path: '/alunos', section: 'Operação'),
     AppSidebarDestination(label: 'Professores', icon: AppIcons.teachers, path: '/professores', section: 'Operação'),
     AppSidebarDestination(label: 'Planos', icon: AppIcons.plans, path: '/planos', section: 'Operação'),
-    // Ainda sem tela — visíveis e inertes, preparando a navegação para
-    // quando os módulos correspondentes chegarem (Módulo 2/Matrículas,
-    // Módulo 4/Agenda, Módulo 3/Financeiro), em vez de aparecerem "do
-    // nada" depois.
-    AppSidebarDestination(label: 'Matrículas', icon: AppIcons.enrollment, path: '/matriculas', section: 'Operação', enabled: false),
-    AppSidebarDestination(label: 'Agenda', icon: AppIcons.calendar, path: '/agenda', section: 'Operação', enabled: false),
-    AppSidebarDestination(label: 'Financeiro', icon: AppIcons.finance, path: '/financeiro', section: 'Operação', enabled: false),
+    AppSidebarDestination(label: 'Matrículas', icon: AppIcons.enrollment, path: '/matriculas', section: 'Operação'),
+    AppSidebarDestination(label: 'Mensalidades', icon: AppIcons.pendingActions, path: '/financeiro/mensalidades', section: 'Operação'),
+    AppSidebarDestination(label: 'Caixa', icon: AppIcons.finance, path: '/financeiro/caixa', section: 'Operação'),
+    AppSidebarDestination(label: 'Painel', icon: AppIcons.activity, path: '/financeiro/painel', section: 'Operação'),
+    AppSidebarDestination(label: 'Modalidades', icon: AppIcons.modalidade, path: '/agenda/modalidades', section: 'Operação'),
+    AppSidebarDestination(label: 'Turmas', icon: AppIcons.turmas, path: '/agenda/turmas', section: 'Operação'),
+    AppSidebarDestination(label: 'Calendário', icon: AppIcons.calendar, path: '/agenda/calendario', section: 'Operação'),
     AppSidebarDestination(label: 'Meu perfil', icon: AppIcons.profile, path: '/perfil', section: 'Conta'),
   ];
 

@@ -40,32 +40,35 @@ class AppDateField extends FormField<DateTime> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
-               return AppFieldChrome(
-                 label: label,
-                 errorText: field.errorText,
-                 prefixIcon: AppIcons.calendar,
-                 enabled: enabled,
-                 child: InkWell(
-                   onTap: enabled
-                       ? () async {
-                           final selecionada = await showDatePicker(
-                             context: context,
-                             initialDate: field.value ?? lastDate,
-                             firstDate: firstDate,
-                             lastDate: lastDate,
-                           );
-                           if (selecionada != null) {
-                             field.didChange(selecionada);
-                             onChanged?.call(selecionada);
+               return AppFieldFocusTracker(
+                 builder: (isFocused) => AppFieldChrome(
+                   label: label,
+                   errorText: field.errorText,
+                   prefixIcon: AppIcons.calendar,
+                   focused: isFocused,
+                   enabled: enabled,
+                   child: InkWell(
+                     onTap: enabled
+                         ? () async {
+                             final selecionada = await showDatePicker(
+                               context: context,
+                               initialDate: field.value ?? lastDate,
+                               firstDate: firstDate,
+                               lastDate: lastDate,
+                             );
+                             if (selecionada != null) {
+                               field.didChange(selecionada);
+                               onChanged?.call(selecionada);
+                             }
                            }
-                         }
-                       : null,
-                   child: Text(
-                     field.value != null
-                         ? _formatar(field.value!, dateFormatPattern)
-                         : placeholder,
-                     style: AppTypography.bodyMedium.copyWith(
-                       color: field.value != null ? colors.text : colors.textFaint,
+                         : null,
+                     child: Text(
+                       field.value != null
+                           ? _formatar(field.value!, dateFormatPattern)
+                           : placeholder,
+                       style: AppTypography.bodyMedium.copyWith(
+                         color: field.value != null ? colors.text : colors.textFaint,
+                       ),
                      ),
                    ),
                  ),

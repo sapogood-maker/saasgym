@@ -1,10 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
+import '../agenda/feriados_api.dart';
+import '../agenda/modalidades_api.dart';
+import '../agenda/aula_alunos_api.dart';
+import '../agenda/aulas_api.dart';
+import '../agenda/recorrencias_api.dart';
+import '../agenda/turma_alunos_api.dart';
+import '../agenda/turmas_api.dart';
 import '../alunos/alunos_api.dart';
 import '../auth/auth_api.dart';
 import '../auth/auth_session.dart';
 import '../dashboard/dashboard_api.dart';
+import '../financeiro/dashboard_financeiro_api.dart';
+import '../financeiro/lancamentos_api.dart';
+import '../financeiro/mensalidades_api.dart';
+import '../matriculas/matriculas_api.dart';
 import '../planos/planos_api.dart';
 import '../professores/professores_api.dart';
 import '../users/users_api.dart';
@@ -57,4 +68,48 @@ final professoresApiProvider = Provider<ProfessoresApi>(
 
 final planosApiProvider = Provider<PlanosApi>(
   (ref) => PlanosApi(ref.watch(apiClientProvider).dio),
+);
+
+final matriculasApiProvider = Provider<MatriculasApi>(
+  (ref) => MatriculasApi(ref.watch(apiClientProvider).dio),
+);
+
+final mensalidadesApiProvider = Provider<MensalidadesApi>(
+  (ref) => MensalidadesApi(ref.watch(apiClientProvider).dio),
+);
+
+final lancamentosApiProvider = Provider<LancamentosApi>(
+  (ref) => LancamentosApi(ref.watch(apiClientProvider).dio),
+);
+
+final dashboardFinanceiroApiProvider = Provider<DashboardFinanceiroApi>(
+  (ref) => DashboardFinanceiroApi(ref.watch(apiClientProvider).dio),
+);
+
+final modalidadesApiProvider = Provider<ModalidadesApi>(
+  (ref) => ModalidadesApi(ref.watch(apiClientProvider).dio),
+);
+
+final feriadosApiProvider = Provider<FeriadosApi>(
+  (ref) => FeriadosApi(ref.watch(apiClientProvider).dio),
+);
+
+final turmasApiProvider = Provider<TurmasApi>(
+  (ref) => TurmasApi(ref.watch(apiClientProvider).dio),
+);
+
+final recorrenciasApiProvider = Provider<RecorrenciasApi>(
+  (ref) => RecorrenciasApi(ref.watch(apiClientProvider).dio),
+);
+
+final turmaAlunosApiProvider = Provider<TurmaAlunosApi>(
+  (ref) => TurmaAlunosApi(ref.watch(apiClientProvider).dio),
+);
+
+final aulasApiProvider = Provider<AulasApi>(
+  (ref) => AulasApi(ref.watch(apiClientProvider).dio),
+);
+
+final aulaAlunosApiProvider = Provider<AulaAlunosApi>(
+  (ref) => AulaAlunosApi(ref.watch(apiClientProvider).dio),
 );

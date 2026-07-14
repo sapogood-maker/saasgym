@@ -52,7 +52,7 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
       _carregar();
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
     } finally {
       if (mounted) {
@@ -81,7 +81,7 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
       }
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
       if (mounted) {
         setState(() => _removendo = false);
@@ -297,11 +297,3 @@ String _periodicidadeLabel(Periodicidade periodicidade) {
   }
 }
 
-String _mensagemErro(DioException e) {
-  final data = e.response?.data;
-  if (data is Map && data['message'] != null) {
-    final message = data['message'];
-    return message is List ? message.join(', ') : message.toString();
-  }
-  return 'Não foi possível concluir a operação.';
-}

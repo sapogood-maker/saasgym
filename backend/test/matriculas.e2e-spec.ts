@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -113,6 +114,10 @@ describe('Matrículas (e2e)', () => {
       expect(criada.body.valor).toBe(150);
       expect(typeof criada.body.valor).toBe('number');
       expect(criada.body.diaVencimento).toBe(10);
+      // Projeção de leitura (evita N+1 na Lista de Matrículas — MS3).
+      expect(criada.body.alunoNome).toBe(aluno.nome);
+      expect(criada.body.planoNome).toBe(plano.nome);
+      expect(criada.body.alunoFotoUrl).toBeNull();
       expect(criada.body.dataFimPrevista).toBe(criada.body.dataFim);
       // MENSAL: 10/01 -> 10/02
       expect(new Date(criada.body.dataFim).getUTCMonth()).toBe(1);
@@ -129,6 +134,7 @@ describe('Matrículas (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
       expect(detalhe.body.alunoId).toBe(aluno.id);
+      expect(detalhe.body.alunoNome).toBe(aluno.nome);
 
       const editada = await request(app.getHttpServer())
         .patch(`/api/matriculas/${criada.body.id}`)
@@ -137,12 +143,39 @@ describe('Matrículas (e2e)', () => {
         .expect(200);
       expect(editada.body.valor).toBe(180);
       expect(editada.body.diaVencimento).toBe(15);
+      expect(editada.body.alunoNome).toBe(aluno.nome);
 
       const listada = await request(app.getHttpServer())
         .get(`/api/matriculas?alunoId=${aluno.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
       expect(listada.body.total).toBe(1);
+      expect(listada.body.items[0].alunoNome).toBe(aluno.nome);
+      expect(listada.body.items[0].planoNome).toBe(plano.nome);
+    });
+
+    it('search filtra por nome do aluno (contains, case-insensitive)', async () => {
+      const { token, aluno, plano } = await cenarioBase('Academia Search Matricula E2E');
+
+      await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.id, dataInicio: '2026-01-10' })
+        .expect(201);
+
+      const trecho = aluno.nome.slice(0, 5).toUpperCase();
+      const encontrada = await request(app.getHttpServer())
+        .get(`/api/matriculas?search=${encodeURIComponent(trecho)}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(encontrada.body.total).toBe(1);
+      expect(encontrada.body.items[0].alunoNome).toBe(aluno.nome);
+
+      const semResultado = await request(app.getHttpServer())
+        .get('/api/matriculas?search=NomeQueNaoExisteNestaAcademia')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(semResultado.body.total).toBe(0);
     });
 
     it('valor negativo -> 400', async () => {
@@ -162,7 +195,7 @@ describe('Matrículas (e2e)', () => {
         .post('/api/matriculas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          alunoId: '00000000-0000-0000-0000-000000000099',
+          alunoId: randomUUID(),
           planoId: plano.id,
           dataInicio: '2026-01-10',
         })
@@ -177,7 +210,7 @@ describe('Matrículas (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({
           alunoId: aluno.id,
-          planoId: '00000000-0000-0000-0000-000000000099',
+          planoId: randomUUID(),
           dataInicio: '2026-01-10',
         })
         .expect(404);

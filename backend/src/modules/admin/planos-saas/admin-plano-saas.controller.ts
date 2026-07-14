@@ -6,15 +6,18 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PlanoSaas } from '@prisma/client';
+import type { Request } from 'express';
 import { AdminPlanoSaasService } from './admin-plano-saas.service';
 import { CreatePlanoSaasDto } from './dto/create-plano-saas.dto';
 import { PlanoSaasResponseDto } from './dto/plano-saas-response.dto';
 import { UpdatePlanoSaasDto } from './dto/update-plano-saas.dto';
 import { SystemAdminGuard } from '../../../common/guards/system-admin.guard';
+import { requestMetadata } from '../../../common/utils/request-metadata';
 
 /// 100% restrito a SYSTEM_ADMIN — nenhum usuário de academia acessa nada
 /// aqui (ver docs/13-admin-saas.md).
@@ -27,8 +30,11 @@ export class AdminPlanoSaasController {
 
   @Post()
   @ApiOperation({ summary: 'Cria um plano do catálogo do SaaS' })
-  async create(@Body() dto: CreatePlanoSaasDto): Promise<PlanoSaasResponseDto> {
-    return this.toResponse(await this.service.create(dto));
+  async create(
+    @Body() dto: CreatePlanoSaasDto,
+    @Req() req: Request,
+  ): Promise<PlanoSaasResponseDto> {
+    return this.toResponse(await this.service.create(dto, requestMetadata(req)));
   }
 
   @Get()
@@ -50,8 +56,9 @@ export class AdminPlanoSaasController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePlanoSaasDto,
+    @Req() req: Request,
   ): Promise<PlanoSaasResponseDto> {
-    return this.toResponse(await this.service.update(id, dto));
+    return this.toResponse(await this.service.update(id, dto, requestMetadata(req)));
   }
 
   private toResponse(plano: PlanoSaas): PlanoSaasResponseDto {

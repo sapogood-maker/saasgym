@@ -46,30 +46,33 @@ class AppSelect<T> extends FormField<T> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
-               return AppFieldChrome(
-                 label: label,
-                 errorText: field.errorText,
-                 helperText: helperText,
-                 enabled: enabled,
-                 child: DropdownButtonHideUnderline(
-                   child: DropdownButton<T>(
-                     value: field.value,
-                     isExpanded: true,
-                     isDense: true,
-                     icon: Icon(AppIcons.chevronDown, size: 16, color: colors.textFaint),
-                     dropdownColor: colors.card,
-                     borderRadius: BorderRadius.circular(10),
-                     style: AppTypography.bodyMedium.copyWith(color: colors.text),
-                     items: [
-                       for (final option in options)
-                         DropdownMenuItem<T>(value: option.value, child: Text(option.label)),
-                     ],
-                     onChanged: enabled
-                         ? (newValue) {
-                             field.didChange(newValue);
-                             onChanged?.call(newValue);
-                           }
-                         : null,
+               return AppFieldFocusTracker(
+                 builder: (isFocused) => AppFieldChrome(
+                   label: label,
+                   errorText: field.errorText,
+                   helperText: helperText,
+                   focused: isFocused,
+                   enabled: enabled,
+                   child: DropdownButtonHideUnderline(
+                     child: DropdownButton<T>(
+                       value: field.value,
+                       isExpanded: true,
+                       isDense: true,
+                       icon: Icon(AppIcons.chevronDown, size: 16, color: colors.textFaint),
+                       dropdownColor: colors.card,
+                       borderRadius: BorderRadius.circular(10),
+                       style: AppTypography.bodyMedium.copyWith(color: colors.text),
+                       items: [
+                         for (final option in options)
+                           DropdownMenuItem<T>(value: option.value, child: Text(option.label)),
+                       ],
+                       onChanged: enabled
+                           ? (newValue) {
+                               field.didChange(newValue);
+                               onChanged?.call(newValue);
+                             }
+                           : null,
+                     ),
                    ),
                  ),
                );

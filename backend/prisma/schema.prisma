@@ -74,6 +74,38 @@ enum AuditAction {
   MATRICULA_UPDATED
   MATRICULA_STATUS_CHANGED
   MATRICULA_DELETED
+  MENSALIDADE_GERADA
+  MENSALIDADE_UPDATED
+  MENSALIDADE_PAGA
+  MENSALIDADE_CANCELADA
+  MENSALIDADE_DELETED
+  LANCAMENTO_CREATED
+  LANCAMENTO_UPDATED
+  LANCAMENTO_DELETED
+  MODALIDADE_CREATED
+  MODALIDADE_UPDATED
+  MODALIDADE_STATUS_CHANGED
+  MODALIDADE_DELETED
+  TURMA_CREATED
+  TURMA_UPDATED
+  TURMA_STATUS_CHANGED
+  TURMA_DELETED
+  RECORRENCIA_CREATED
+  RECORRENCIA_UPDATED
+  RECORRENCIA_DELETED
+  AULA_GERADA
+  AULA_CANCELADA
+  AULA_SUBSTITUICAO
+  AULA_EXTRA_CRIADA
+  AULA_DELETED
+  TURMA_ALUNO_MATRICULADO
+  TURMA_ALUNO_STATUS_CHANGED
+  TURMA_ALUNO_REMOVIDO
+  AULA_ALUNO_PRESENCA_MARCADA
+  AULA_ALUNO_REPOSICAO_CRIADA
+  FERIADO_CREATED
+  FERIADO_UPDATED
+  FERIADO_DELETED
 }
 
 enum ArquivoCategoria {
@@ -120,6 +152,71 @@ enum MotivoCancelamento {
   OUTRO
 }
 
+/// PENDENTE/PAGA/CANCELADA apenas — "atrasada" é sempre calculado
+/// (status = PENDENTE && dataVencimento < hoje), nunca um status
+/// armazenado que precisaria de um scheduler pra ser mantido em dia (o
+/// projeto não tem infraestrutura de cron). Ver
+/// docs/17-modulo-3-financeiro-analise.md, item 1.
+enum MensalidadeStatus {
+  PENDENTE
+  PAGA
+  CANCELADA
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  PIX
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  BOLETO
+  OUTRO
+}
+
+enum LancamentoTipo {
+  RECEITA
+  DESPESA
+}
+
+/// Origem explícita do Lancamento — evita heurística baseada em
+/// `mensalidadeId != null` pra decidir se é editável/removível (docs/17,
+/// seção "MS4 — Lançamento é cadastro ou Livro Caixa?"). MANUAL é sempre
+/// criado via `LancamentosService.create`; MENSALIDADE só nasce dentro de
+/// `MensalidadesService.marcarPaga`, nunca escolhido pelo cliente.
+enum LancamentoOrigem {
+  MANUAL
+  MENSALIDADE
+}
+
+/// Módulo 4 — Agenda (docs/18-modulo-4-agenda-analise.md).
+enum RecorrenciaTipo {
+  SEMANAL
+  MENSAL
+  INTERVALADA
+}
+
+/// "Realizada" nunca é armazenado — é sempre calculado
+/// (`status == AGENDADA && data < hoje`), mesmo princípio de
+/// `Mensalidade.atrasada` (docs/17, item 1). Ver docs/18, seção 2 item 4.
+enum AulaStatus {
+  AGENDADA
+  CANCELADA
+}
+
+enum AulaAlunoTipo {
+  MATRICULADO
+  FILA_ESPERA
+  REPOSICAO
+}
+
+/// `JUSTIFICADA` já nasce aqui (sem fluxo de aprovação por trás nesta
+/// fase) para evitar uma migration futura só para acrescentar um 3º
+/// estado — docs/18, ajuste pedido antes do MS1.
+enum PresencaStatus {
+  PRESENTE
+  AUSENTE
+  JUSTIFICADA
+}
+
 /// Tenant: cada academia cliente do SaaS.
 model Academia {
   id       String         @id @default(uuid())
@@ -145,6 +242,15 @@ model Academia {
   professores  Professor[]
   planos       Plano[]
   matriculas   Matricula[]
+  mensalidades Mensalidade[]
+  lancamentos  Lancamento[]
+  modalidades  Modalidade[]
+  turmas       Turma[]
+  recorrencias Recorrencia[]
+  aulas        Aula[]
+  turmaAlunos  TurmaAluno[]
+  aulaAlunos   AulaAluno[]
+  feriados     Feriado[]
 
   @@map("academias")
 }
@@ -255,7 +361,10 @@ model Aluno {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  matriculas Matricula[]
+  matriculas   Matricula[]
+  mensalidades Mensalidade[]
+  turmaAlunos  TurmaAluno[]
+  aulaAlunos   AulaAluno[]
 
   @@unique([academiaId, cpf])
   @@index([academiaId])
@@ -286,6 +395,10 @@ model Professor {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  turmasComoTitular       Turma[]       @relation("TurmasComoTitular")
+  recorrenciasComoTitular Recorrencia[] @relation("RecorrenciasComoTitular")
+  aulasComoProfessor      Aula[]        @relation("AulasComoProfessor")
 
   @@unique([academiaId, cpf])
   @@index([academiaId])
@@ -380,10 +493,359 @@ model Matricula {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  mensalidades Mensalidade[]
+  turmaAlunos  TurmaAluno[]
+
   @@index([academiaId])
   @@index([alunoId])
   @@index([planoId])
   @@map("matriculas")
+}
+
+/// Cobrança mensal derivada de uma Matricula — sempre 1 mês, independente
+/// da periodicidade do Plano (uma matrícula trimestral gera 3
+/// Mensalidades ao longo da vigência, não 1 cobrança triplicada — docs/17,
+/// item 3). Gerada sob demanda (`gerar()`, sem scheduler — docs/17, item
+/// 2), nunca duplicada pro mesmo (matriculaId, mês, ano) — ver
+/// `MensalidadesService.gerar`.
+///
+/// `valor` é snapshot de `Matricula.valor` no momento da geração (mesmo
+/// princípio de `Matricula.valor` vs `Plano.valor`, docs/16 item 1).
+/// `desconto`/`multa` ajustam só aquela cobrança específica; `valorFinal`
+/// (valor - desconto + multa) é sempre calculado na resposta, nunca
+/// armazenado (docs/17, item 6). `alunoId` denormalizado pra query direta,
+/// mesmo padrão de `Matricula.createdByUserId`.
+///
+/// Tenant-scoped, soft delete reservado a erro de cadastro (bloqueado
+/// quando `status = PAGA` — ver `MensalidadesService.remove` — pra nunca
+/// órfão o `Lancamento` gerado pelo pagamento, docs/17 item 4).
+model Mensalidade {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  matriculaId String
+  matricula   Matricula @relation(fields: [matriculaId], references: [id])
+
+  alunoId String
+  aluno   Aluno  @relation(fields: [alunoId], references: [id])
+
+  valor    Decimal @db.Decimal(10, 2)
+  desconto Decimal @default(0) @db.Decimal(10, 2)
+  multa    Decimal @default(0) @db.Decimal(10, 2)
+
+  dataVencimento DateTime
+  dataPagamento  DateTime?
+
+  status             MensalidadeStatus @default(PENDENTE)
+  motivoCancelamento String?
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lancamento Lancamento?
+
+  @@index([academiaId])
+  @@index([matriculaId])
+  @@index([alunoId])
+  @@index([dataVencimento])
+  @@map("mensalidades")
+}
+
+/// Receita/despesa manual (venda avulsa, conta, salário) — independente de
+/// Mensalidade, não a mesma tabela com discriminador, pra evitar "god
+/// table" (docs/17, item 4; mesmo princípio de docs/02, "Princípios de
+/// modelagem"). Quando uma Mensalidade é marcada como paga,
+/// `MensalidadesService.marcarPaga` cria um Lancamento(tipo=RECEITA)
+/// automaticamente ligado a ela (`mensalidadeId`) — fluxo de caixa nunca
+/// precisa fazer UNION com a tabela de mensalidades.
+///
+/// `origem` é o campo autoritativo pra decidir se é editável/removível
+/// (ver enum `LancamentoOrigem`) — um Lancamento com `mensalidadeId`
+/// preenchido é sempre `origem = MENSALIDADE`, gerado pelo sistema, não
+/// editável/removível pelo CRUD genérico de Lancamento (ver
+/// `LancamentosService.update`/`remove`) — reverter um pagamento é
+/// cancelar a Mensalidade, não editar o lançamento diretamente.
+model Lancamento {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  tipo           LancamentoTipo
+  origem         LancamentoOrigem @default(MANUAL)
+  descricao      String
+  categoria      String?
+  valor          Decimal          @db.Decimal(10, 2)
+  data           DateTime
+  formaPagamento FormaPagamento?
+
+  mensalidadeId String?      @unique
+  mensalidade   Mensalidade? @relation(fields: [mensalidadeId], references: [id])
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([academiaId])
+  @@index([mensalidadeId])
+  @@index([data])
+  @@map("lancamentos")
+}
+
+/// Categoria de aula (ex. "Funcional", "Musculação") — entidade própria
+/// (não texto livre) porque a mesma modalidade reaparece em várias
+/// `Turma`s reais (professores/horários diferentes) e alimenta cor de
+/// exibição na grade — texto livre quebraria agrupamento/filtro
+/// (docs/18-modulo-4-agenda-analise.md, seção 2 item 1).
+model Modalidade {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  nome   String
+  cor    String? // hex, ex. "#3B82F6" — cor de exibição na grade
+  status UserStatus @default(ATIVO)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  turmas Turma[]
+
+  @@unique([academiaId, nome])
+  @@index([academiaId])
+  @@map("modalidades")
+}
+
+/// O grupo (docs/18, seção 2 item 2) — "Funcional 7h", professor titular,
+/// modalidade, capacidade. `status` reaproveita `UserStatus` (não o ciclo
+/// rico de `MatriculaStatus` — Turma não tranca, só ativa/inativa, mesmo
+/// padrão de `Plano`). Sem `@@unique` de nome — duas Turmas podem
+/// compartilhar nome em horários/professores diferentes.
+model Turma {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  nome             String
+  modalidadeId     String
+  modalidade       Modalidade @relation(fields: [modalidadeId], references: [id])
+  professorId      String // titular padrão — sobrescrevível por Recorrencia/Aula
+  professor        Professor  @relation("TurmasComoTitular", fields: [professorId], references: [id])
+  capacidadeMaxima Int? // null = ilimitado, mesma convenção de Plano.quantidadeAulas
+  local            String?
+  status           UserStatus @default(ATIVO)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  recorrencias Recorrencia[]
+  aulas        Aula[]
+  turmaAlunos  TurmaAluno[]
+
+  @@index([academiaId])
+  @@index([modalidadeId])
+  @@index([professorId])
+  @@map("turmas")
+}
+
+/// Quando as aulas de uma Turma acontecem (docs/18, seção 2 item 3). Uma
+/// linha por padrão de repetição — uma Turma seg/qua/sex tem 3 linhas,
+/// não um array de dias. Só o(s) campo(s) do `tipo` correspondente é
+/// preenchido (validado no service, mesmo padrão condicional de
+/// `Mensalidade.motivoCancelamentoDetalhe`). `professorId` aqui é override
+/// pontual do titular da Turma só para esta recorrência.
+model Recorrencia {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  turmaId String
+  turma   Turma  @relation(fields: [turmaId], references: [id])
+
+  tipo RecorrenciaTipo
+
+  diaSemana     Int? // 0-6 — obrigatório se tipo = SEMANAL
+  diaDoMes      Int? // 1-31 — obrigatório se tipo = MENSAL (dia fixo, sem "n-ésimo dia da semana")
+  intervaloDias Int? // obrigatório se tipo = INTERVALADA
+
+  horaInicio     String // "HH:mm" — evita tipo "hora" não portável e ambiguidade de fuso
+  duracaoMinutos Int
+
+  professorId String?
+  professor   Professor? @relation("RecorrenciasComoTitular", fields: [professorId], references: [id])
+
+  dataInicioVigencia DateTime
+  dataFimVigencia    DateTime?
+  ativo              Boolean   @default(true)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  aulas Aula[]
+
+  @@index([academiaId])
+  @@index([turmaId])
+  @@map("recorrencias")
+}
+
+/// A ocorrência concreta (docs/18, seção 2 item 4) — sempre snapshot de
+/// Recorrencia/Turma no momento da geração, nunca referência viva (mesmo
+/// princípio de Matricula.valor/Mensalidade.valor). É esse snapshot que
+/// permite professor substituto pontual (editar só `professorId` desta
+/// linha) sem afetar Turma/Recorrencia, e que impede uma mudança de
+/// capacidade/professor da Turma de alterar retroativamente aulas já
+/// geradas. `recorrenciaId` nulo = "aula extra" (avulsa). `status` guarda
+/// só AGENDADA/CANCELADA — "realizada" é sempre calculado.
+model Aula {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  turmaId       String
+  turma         Turma        @relation(fields: [turmaId], references: [id])
+  recorrenciaId String? // null = aula extra (avulsa, sem recorrência)
+  recorrencia   Recorrencia? @relation(fields: [recorrenciaId], references: [id])
+
+  data             DateTime
+  horaInicio       String // snapshot da Recorrencia (ou valor manual, aula extra)
+  duracaoMinutos   Int
+  professorId      String // snapshot — permite substituto pontual
+  professor        Professor @relation("AulasComoProfessor", fields: [professorId], references: [id])
+  capacidadeMaxima Int? // snapshot de Turma.capacidadeMaxima no momento da geração
+
+  status             AulaStatus @default(AGENDADA)
+  motivoCancelamento String?
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  alunos AulaAluno[]
+
+  @@unique([recorrenciaId, data]) // idempotência da geração (docs/18, regra 3)
+  @@index([academiaId])
+  @@index([turmaId])
+  @@index([data])
+  @@map("aulas")
+}
+
+/// Vínculo permanente aluno↔turma (docs/18, seção 2 item 6 — evolução
+/// proposta sobre o modelo original de 3 camadas: sem isto, matricular um
+/// aluno numa turma recorrente exigiria adicioná-lo manualmente em cada
+/// aula). Exige `matriculaId` de uma Matricula ATIVA (elegibilidade,
+/// validada no service). Ao gerar `Aula`, cada `TurmaAluno` ativo vira um
+/// `AulaAluno(tipo=MATRICULADO)` — snapshot da lista de matriculados.
+///
+/// **Invariante (docs/18, seção 2 item 6, MS5)**: `TurmaAluno` representa
+/// só a inscrição permanente do aluno na turma — nunca cria, altera ou
+/// remove `AulaAluno`; `AulaAluno` nasce exclusivamente no gerador do MS6,
+/// como snapshot dos `TurmaAluno` ativos naquele momento.
+///
+/// Sem `@@unique([turmaId, alunoId])` de propósito: "sair da turma" é
+/// `status = INATIVO` (encerramento de negócio, não `deletedAt` — mesmo
+/// critério do item 11), então a linha continua existindo depois de sair;
+/// uma unique constraint bloquearia permanentemente uma nova inscrição do
+/// mesmo aluno na mesma turma. A regra "só uma inscrição ATIVA por vez"
+/// é validada no service (`garantirSemInscricaoAtiva`), mesmo padrão já
+/// usado para "uma Matricula ATIVA por aluno" (`docs/16`, item 1).
+model TurmaAluno {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  turmaId     String
+  turma       Turma     @relation(fields: [turmaId], references: [id])
+  alunoId     String
+  aluno       Aluno     @relation(fields: [alunoId], references: [id])
+  matriculaId String
+  matricula   Matricula @relation(fields: [matriculaId], references: [id])
+
+  status     UserStatus @default(ATIVO)
+  dataInicio DateTime   @default(now())
+  dataFim    DateTime?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  aulaAlunos AulaAluno[]
+
+  @@index([academiaId])
+  @@index([turmaId])
+  @@index([alunoId])
+  @@map("turma_alunos")
+}
+
+/// Vínculo por ocorrência — presença, fila de espera e reposição vivem
+/// todos aqui, sem entidades próprias (docs/18, seção 2 item 5 e
+/// "Entidades avaliadas e não criadas"). `presenca` nulo = ainda não
+/// marcado. `reposicaoDeAulaAlunoId` aponta para o AulaAluno original (de
+/// outra aula) que esta reposição substitui. Cancelar a Aula não apaga
+/// estas linhas — o histórico de quem estava inscrito permanece.
+model AulaAluno {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  aulaId       String
+  aula         Aula        @relation(fields: [aulaId], references: [id])
+  alunoId      String
+  aluno        Aluno       @relation(fields: [alunoId], references: [id])
+  turmaAlunoId String? // preenchido quando a origem é a matrícula permanente na turma
+  turmaAluno   TurmaAluno? @relation(fields: [turmaAlunoId], references: [id])
+
+  tipo     AulaAlunoTipo   @default(MATRICULADO)
+  presenca PresencaStatus? // null = não marcado ainda
+
+  reposicaoDeAulaAlunoId String?    @unique
+  reposicaoDeAulaAluno   AulaAluno? @relation("Reposicao", fields: [reposicaoDeAulaAlunoId], references: [id])
+  reposicaoGerada        AulaAluno? @relation("Reposicao")
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([aulaId, alunoId])
+  @@index([academiaId])
+  @@index([aulaId])
+  @@index([alunoId])
+  @@map("aula_alunos")
+}
+
+/// Cadastro próprio por academia, datas explícitas (docs/18, seção 2 item
+/// 8) — cada academia fecha em dias diferentes, sem calendário nacional
+/// fixo. Usado pelo gerador de Aula (pula a data) e cancela
+/// automaticamente qualquer Aula já gerada pra aquela data ao ser criado.
+model Feriado {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  nome String
+  data DateTime
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([academiaId, data])
+  @@index([academiaId])
+  @@map("feriados")
 }
 
 /// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
@@ -406,8 +868,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens     RefreshToken[]
-  matriculasCriadas Matricula[]
+  refreshTokens       RefreshToken[]
+  matriculasCriadas   Matricula[]
+  mensalidadesCriadas Mensalidade[]
+  lancamentosCriados  Lancamento[]
+  aulasCriadas        Aula[]
 
   @@index([academiaId])
   @@map("users")

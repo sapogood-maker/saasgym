@@ -153,8 +153,31 @@ Novas ações de `AuditAction`: `MATRICULA_CREATED`, `MATRICULA_UPDATED`, `MATRI
 
 O modelo proposto na seção "Rascunho de schema" acima está validado e pronto para ir a plano de implementação (MS1 do Módulo 2 — schema + migration + `MatriculasService`).
 
+## Matriz de estados e transições (MS5 — Detalhe)
+
+Extraída diretamente das guardas já implementadas em `MatriculasService` (MS1) — o Detalhe só pode mostrar as ações que o backend de fato aceita para cada status; nenhuma regra nova foi inventada aqui.
+
+| De \ Ação | Editar (valor/vencimento) | Trancar | Reativar | Cancelar | Renovar | Remover |
+|---|---|---|---|---|---|---|
+| **ATIVA** | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| **TRANCADA** | ✅ | — | ✅ | ✅ | ❌ | ✅ |
+| **CANCELADA** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **ENCERRADA** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+`—` = não se aplica ao estado atual (ex.: uma `ATIVA` não tem o que "reativar"); `❌` = o backend rejeita com 400 (estado incompatível com a transição, não uma questão de permissão de papel).
+
+**Justificativa por transição:**
+
+- **Editar (valor/diaVencimento)** — permitido em `ATIVA`/`TRANCADA`, bloqueado em estado terminal (`CANCELADA`/`ENCERRADA`). Regra já existente desde o MS1 (`garantirNaoTerminal`): um contrato encerrado não tem "valor mensal" para corrigir — o valor histórico é o registro do que foi cobrado, não um campo vivo.
+- **Trancar** — só a partir de `ATIVA`. Pausa temporária (viagem, lesão, etc.) só faz sentido para uma matrícula em curso; uma já `TRANCADA` trancar de novo não é uma transição, é redundante.
+- **Reativar** — só a partir de `TRANCADA`. É o inverso exato de Trancar; estende `dataFim` pelos dias congelados (docs acima, item 5).
+- **Cancelar** — a partir de `ATIVA` **ou** `TRANCADA`. O aluno pode desistir tanto estando em curso quanto durante uma pausa — em ambos os casos o encerramento é definitivo e exige motivo categorizado (item 10). Cancelar uma já `CANCELADA`/`ENCERRADA` não tem efeito (já é terminal).
+- **Renovar** — só a partir de `ATIVA`. Renovação é extensão de uma vigência **em curso** pro próximo período; uma matrícula `TRANCADA` não está em curso — o fluxo correto é Reativar primeiro, Renovar depois (dois passos deliberados, não uma renovação-que-também-reativa, pra manter cada transição fazendo uma coisa só).
+- **Remover** — disponível em **qualquer** status. É o "corrigir erro de cadastro" (docs acima, item 8), não uma transição de negócio — por isso não é condicionada a status, mesmo padrão de Aluno/Professor/Plano (o botão "Remover" nunca é condicionado a status nesses três). O diálogo de confirmação deixa isso explícito e aponta pra Cancelar como o caminho correto pra um encerramento de verdade, mas não bloqueia.
+
 ## Histórico
 
 - **2026-07-11**: primeira versão — análise de domínio antes de qualquer implementação do Módulo 2, conforme decisão de encerramento do Módulo 1.
 - **2026-07-11**: as 3 decisões de negócio em aberto foram confirmadas pelo dono do produto, todas seguindo a opção recomendada. Modelo de domínio considerado fechado para o MVP do Módulo 2.
 - **2026-07-11**: refinamentos finais antes da implementação — `dataFimPrevista` (item 9), `motivoCancelamento` categorizado (item 10), `createdByUserId` (item 11) e regra oficial de imutabilidade de `planoId` (item 12). Aprovado para o MS1 (migration + `MatriculasService` + endpoints + auditoria + testes e2e).
+- **2026-07-12, MS5**: matriz de estados e transições documentada (seção acima) antes da implementação do Detalhe — `MatriculaDetailScreen` concentra trancar/reativar/cancelar/renovar/remover, cada botão condicionado ao status atual. `Cancelar` usa um diálogo próprio (motivo categorizado + detalhe condicional), não `AppConfirmDialog` (não suporta campos). As duas tags `'SPRINT 5 · MATRÍCULAS'` (ponta solta acima) corrigidas para `'MÓDULO 2 · MATRÍCULAS'`. Com Lista (MS3), Formulário (MS4) e Detalhe (MS5) completos, o Módulo 2 está funcionalmente fechado — falta só a Sprint de Consolidação.

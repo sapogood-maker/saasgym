@@ -223,6 +223,16 @@ void main() {
 
     expect(find.text('Alunos'), findsWidgets);
     expect(find.text('Professores'), findsWidgets);
+
+    // A sidebar cresceu bastante desde que este teste foi escrito (agora
+    // cobre Cadastros/Agenda/Financeiro/Conta) — "Meu perfil" (seção
+    // "Conta") não cabe mais na viewport padrão de teste e o ListView só
+    // constrói o que está visível. Rola até revelá-lo antes de checar.
+    await tester.scrollUntilVisible(
+      find.text('Meu perfil'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Meu perfil'), findsWidgets);
     expect(find.text('Não foi possível carregar o dashboard.'), findsOneWidget);
   });
@@ -356,8 +366,8 @@ void main() {
     // Seções ainda sem funcionalidade aparecem como placeholder com a tag
     // da sprint responsável — nunca dado inventado.
     expect(find.text('Matrículas'), findsOneWidget);
-    expect(find.text('SPRINT 5 · MATRÍCULAS'), findsOneWidget);
-    expect(find.text('SPRINT 6 · FINANCEIRO'), findsOneWidget);
+    expect(find.text('MÓDULO 2 · MATRÍCULAS'), findsOneWidget);
+    expect(find.text('MÓDULO 3 · FINANCEIRO'), findsOneWidget);
   });
 
   testWidgets('lista de professores renderiza os itens retornados pela API', (
@@ -433,7 +443,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Plano Musculação'), findsOneWidget);
-    expect(find.textContaining('Mensal'), findsOneWidget);
+    // "Mensal" sozinho hoje casa também com o item "Mensalidades" da
+    // sidebar (Financeiro) — mira o texto completo da linha do plano.
+    expect(find.textContaining('Mensal · Aulas ilimitadas'), findsOneWidget);
     expect(find.textContaining('R\$'), findsOneWidget);
   });
 
@@ -575,8 +587,8 @@ void main() {
     // Seções futuras diferentes das de Aluno — Turmas/Financeiro fazem
     // sentido pra um professor, Avaliações/Frequência/Treinos não.
     expect(find.text('Turmas'), findsOneWidget);
-    expect(find.text('SPRINT 9 · AGENDA'), findsOneWidget);
-    expect(find.text('SPRINT 6 · FINANCEIRO'), findsOneWidget);
+    expect(find.text('MÓDULO 4 · MS6'), findsOneWidget);
+    expect(find.text('MÓDULO 3 · FINANCEIRO'), findsOneWidget);
   });
 
   testWidgets('formulário de professor mostra erro de validação em todos os campos obrigatórios', (

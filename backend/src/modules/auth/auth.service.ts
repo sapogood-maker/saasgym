@@ -3,14 +3,10 @@ import { Academia, AuditAction, PlanoSaas, User, UserStatus } from '@prisma/clie
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
 import { isAcademiaStatusBlocking } from '../../common/academia/academia-status.util';
+import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TokenService } from './tokens/token.service';
 import { UserProfileDto } from './dto/user-profile.dto';
-
-export interface RequestMetadata {
-  ipAddress?: string;
-  userAgent?: string;
-}
 
 export interface LoginResult {
   accessToken: string;

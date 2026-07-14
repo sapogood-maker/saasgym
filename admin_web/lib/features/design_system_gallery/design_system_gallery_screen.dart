@@ -214,7 +214,7 @@ class _TypographyShowcase extends StatelessWidget {
       ('titleMedium', AppTypography.titleMedium, 'Nenhum aluno cadastrado'),
       ('bodyMedium', AppTypography.bodyMedium, 'Admin cadastrou o aluno Rodrigo Castro.'),
       ('bodySmall', AppTypography.bodySmall, 'Plano Trimestral'),
-      ('labelSmall', AppTypography.labelSmall, 'SPRINT 6 · FINANCEIRO'),
+      ('labelSmall', AppTypography.labelSmall, 'MÓDULO 3 · FINANCEIRO'),
       ('mono', AppTypography.mono, '128'),
       ('monoSmall', AppTypography.monoSmall, '12/jul'),
     ];
@@ -472,7 +472,7 @@ class _EmptyStatesShowcase extends StatelessWidget {
             icon: AppIcons.finance,
             title: 'Mensalidades vencendo',
             description: 'Pagamentos que vencem nos próximos 7 dias.',
-            sprintTag: 'SPRINT 6 · FINANCEIRO',
+            sprintTag: 'MÓDULO 3 · FINANCEIRO',
           ),
         ),
       ],

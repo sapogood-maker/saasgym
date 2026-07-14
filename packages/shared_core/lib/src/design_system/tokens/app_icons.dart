@@ -46,4 +46,6 @@ abstract final class AppIcons {
   static const IconData workout = LucideIcons.dumbbell;
   static const IconData files = LucideIcons.paperclip;
   static const IconData plans = LucideIcons.layers;
+  static const IconData turmas = LucideIcons.layoutGrid;
+  static const IconData modalidade = LucideIcons.tag;
 }

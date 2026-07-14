@@ -9,12 +9,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Academia } from '@prisma/client';
+import type { Request } from 'express';
 import { AdminAcademiaConfiguracaoService } from './admin-academia-configuracao.service';
 import { AdminAcademiaService } from './admin-academia.service';
 import { AcademiaConfiguracaoResponseDto } from './dto/academia-configuracao-response.dto';
@@ -26,6 +28,7 @@ import { UpdateAcademiaConfiguracaoDto } from './dto/update-academia-configuraca
 import { UpdateAcademiaStatusDto } from './dto/update-academia-status.dto';
 import { SystemAdminGuard } from '../../../common/guards/system-admin.guard';
 import { ImageFileInterceptor } from '../../../common/upload/image-file-interceptor';
+import { requestMetadata } from '../../../common/utils/request-metadata';
 
 /// 100% restrito a SYSTEM_ADMIN — nenhum usuário de academia acessa nada
 /// aqui (ver docs/13-admin-saas.md).
@@ -43,8 +46,11 @@ export class AdminAcademiaController {
   @ApiOperation({
     summary: 'Cria uma academia + seu primeiro ACADEMIA_ADMIN, numa única transação',
   })
-  async create(@Body() dto: CreateAcademiaDto): Promise<AcademiaResponseDto> {
-    const academia = await this.service.create(dto);
+  async create(
+    @Body() dto: CreateAcademiaDto,
+    @Req() req: Request,
+  ): Promise<AcademiaResponseDto> {
+    const academia = await this.service.create(dto, requestMetadata(req));
     return this.toResponse(academia);
   }
 
@@ -66,8 +72,9 @@ export class AdminAcademiaController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAcademiaDto,
+    @Req() req: Request,
   ): Promise<AcademiaResponseDto> {
-    return this.toResponse(await this.service.update(id, dto));
+    return this.toResponse(await this.service.update(id, dto, requestMetadata(req)));
   }
 
   @Patch(':id/status')
@@ -78,8 +85,9 @@ export class AdminAcademiaController {
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAcademiaStatusDto,
+    @Req() req: Request,
   ): Promise<AcademiaResponseDto> {
-    return this.toResponse(await this.service.updateStatus(id, dto));
+    return this.toResponse(await this.service.updateStatus(id, dto, requestMetadata(req)));
   }
 
   @Get(':id/configuracao')
@@ -95,8 +103,9 @@ export class AdminAcademiaController {
   updateConfiguracao(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAcademiaConfiguracaoDto,
+    @Req() req: Request,
   ): Promise<AcademiaConfiguracaoResponseDto> {
-    return this.configuracaoService.update(id, dto);
+    return this.configuracaoService.update(id, dto, requestMetadata(req));
   }
 
   @Post(':id/logo')
@@ -109,11 +118,12 @@ export class AdminAcademiaController {
   async uploadLogo(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: Request,
   ): Promise<AcademiaConfiguracaoResponseDto> {
     if (!file) {
       throw new BadRequestException('Nenhum arquivo enviado');
     }
-    return this.configuracaoService.updateLogo(id, file);
+    return this.configuracaoService.updateLogo(id, file, requestMetadata(req));
   }
 
   private toResponse(academia: Academia): AcademiaResponseDto {

@@ -9,6 +9,7 @@ import { UpdateAcademiaDto } from './dto/update-academia.dto';
 import { UpdateAcademiaStatusDto } from './dto/update-academia-status.dto';
 import { isAcademiaStatusBlocking } from '../../../common/academia/academia-status.util';
 import { TenantContextService } from '../../../common/context/tenant-context.service';
+import { RequestMetadata } from '../../../common/utils/request-metadata';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 
@@ -31,8 +32,8 @@ export class AdminAcademiaService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async create(input: ProvisionAcademiaInput): Promise<Academia> {
-    const { academia } = await this.provisioningService.provision(input);
+  async create(input: ProvisionAcademiaInput, meta: RequestMetadata = {}): Promise<Academia> {
+    const { academia } = await this.provisioningService.provision(input, meta);
     return academia;
   }
 
@@ -60,7 +61,11 @@ export class AdminAcademiaService {
     return academia;
   }
 
-  async update(id: string, dto: UpdateAcademiaDto): Promise<Academia> {
+  async update(
+    id: string,
+    dto: UpdateAcademiaDto,
+    meta: RequestMetadata = {},
+  ): Promise<Academia> {
     await this.findOne(id);
 
     const academia = await this.prisma.academia.update({ where: { id }, data: dto });
@@ -70,6 +75,7 @@ export class AdminAcademiaService {
       academiaId: id,
       userId: this.tenantContext.getUserId(),
       metadata: { camposAlterados: Object.keys(dto) },
+      ...meta,
     });
 
     return academia;
@@ -80,23 +86,35 @@ export class AdminAcademiaService {
   /// mas entrar num status bloqueante revoga em cascata todas as sessões
   /// ativas dos usuários da academia, fechando o gap de acesso em, no
   /// máximo, a vida do access token já emitido (mesmo trade-off já aceito
-  /// no Sprint 1 para troca de senha — ver docs/11-security.md).
-  async updateStatus(id: string, dto: UpdateAcademiaStatusDto): Promise<Academia> {
+  /// no Sprint 1 para troca de senha — ver docs/11-security.md). As duas
+  /// escritas (status da Academia + revogação em cascata) vão na mesma
+  /// $transaction: sem isso, uma falha entre elas deixaria a academia
+  /// bloqueada com sessões de usuário ainda válidas — exatamente o cenário
+  /// que este método existe para fechar.
+  async updateStatus(
+    id: string,
+    dto: UpdateAcademiaStatusDto,
+    meta: RequestMetadata = {},
+  ): Promise<Academia> {
     const antes = await this.findOne(id);
 
-    const academia = await this.prisma.academia.update({
-      where: { id },
-      data: { status: dto.status },
-    });
-
-    let sessoesRevogadas = 0;
-    if (isAcademiaStatusBlocking(dto.status)) {
-      const resultado = await this.prisma.refreshToken.updateMany({
-        where: { user: { academiaId: id }, revokedAt: null },
-        data: { revokedAt: new Date() },
+    const { academia, sessoesRevogadas } = await this.prisma.$transaction(async (tx) => {
+      const academiaAtualizada = await tx.academia.update({
+        where: { id },
+        data: { status: dto.status },
       });
-      sessoesRevogadas = resultado.count;
-    }
+
+      let revogadas = 0;
+      if (isAcademiaStatusBlocking(dto.status)) {
+        const resultado = await tx.refreshToken.updateMany({
+          where: { user: { academiaId: id }, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        revogadas = resultado.count;
+      }
+
+      return { academia: academiaAtualizada, sessoesRevogadas: revogadas };
+    });
 
     await this.auditService.record({
       action: AuditAction.ACADEMIA_STATUS_CHANGED,
@@ -108,6 +126,7 @@ export class AdminAcademiaService {
         motivo: dto.motivo,
         sessoesRevogadas,
       },
+      ...meta,
     });
 
     return academia;

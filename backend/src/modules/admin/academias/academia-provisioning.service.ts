@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Academia, AcademiaStatus, AuditAction, Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../../audit/audit.service';
+import { RequestMetadata } from '../../../common/utils/request-metadata';
 import { TenantContextService } from '../../../common/context/tenant-context.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -43,7 +44,10 @@ export class AcademiaProvisioningService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async provision(input: ProvisionAcademiaInput): Promise<ProvisionAcademiaResult> {
+  async provision(
+    input: ProvisionAcademiaInput,
+    meta: RequestMetadata = {},
+  ): Promise<ProvisionAcademiaResult> {
     const planoSaasId = input.planoSaasId ?? (await this.resolveDefaultPlanoId());
     const senhaHash = await bcrypt.hash(input.adminInicial.senha, 10);
     const trialExpiresAt = this.computeTrialExpiry();
@@ -83,6 +87,7 @@ export class AcademiaProvisioningService {
       academiaId: academia.id,
       userId: this.tenantContext.getUserId(),
       metadata: { adminInicialEmail: adminUser.email },
+      ...meta,
     });
 
     this.eventEmitter.emit('academia.provisionada', {

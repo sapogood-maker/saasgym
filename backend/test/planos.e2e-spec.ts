@@ -61,7 +61,9 @@ describe('Planos (e2e)', () => {
 
   describe('CRUD', () => {
     it('ALUNO (sem permissão nenhuma no módulo) -> 403 ao listar', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Aluno Sem Acesso Plano E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Aluno Sem Acesso Plano E2E',
+      });
       const token = await criarUsuarioELogar(Role.ALUNO, academia.id);
 
       await request(app.getHttpServer())
@@ -71,7 +73,9 @@ describe('Planos (e2e)', () => {
     });
 
     it('PROFESSOR consegue listar mas não criar (403)', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Professor Leitura Plano E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Professor Leitura Plano E2E',
+      });
       const token = await criarUsuarioELogar(Role.PROFESSOR, academia.id);
 
       await request(app.getHttpServer())
@@ -152,7 +156,9 @@ describe('Planos (e2e)', () => {
     });
 
     it('periodicidade inválida -> 400', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Periodicidade Invalida E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Periodicidade Invalida E2E',
+      });
       const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
 
       await request(app.getHttpServer())
@@ -163,7 +169,9 @@ describe('Planos (e2e)', () => {
     });
 
     it('nome duplicado na mesma academia -> 409', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Nome Duplicado Plano E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Nome Duplicado Plano E2E',
+      });
       const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
       const payload = { nome: 'Plano Repetido', periodicidade: 'MENSAL', valor: 100 };
 
@@ -181,8 +189,12 @@ describe('Planos (e2e)', () => {
     });
 
     it('mesmo nome em academias diferentes é permitido', async () => {
-      const academiaA = await createAcademiaFixture(prisma, { nome: 'Academia Nome Repetido A Plano E2E' });
-      const academiaB = await createAcademiaFixture(prisma, { nome: 'Academia Nome Repetido B Plano E2E' });
+      const academiaA = await createAcademiaFixture(prisma, {
+        nome: 'Academia Nome Repetido A Plano E2E',
+      });
+      const academiaB = await createAcademiaFixture(prisma, {
+        nome: 'Academia Nome Repetido B Plano E2E',
+      });
       const tokenA = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academiaA.id);
       const tokenB = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academiaB.id);
       const payload = { nome: 'Plano Padrão', periodicidade: 'MENSAL', valor: 100 };
@@ -213,8 +225,12 @@ describe('Planos (e2e)', () => {
 
   describe('Isolamento entre tenants', () => {
     it('academia A não vê, não edita e não deleta plano da academia B', async () => {
-      const academiaA = await createAcademiaFixture(prisma, { nome: 'Academia Isolamento A Plano E2E' });
-      const academiaB = await createAcademiaFixture(prisma, { nome: 'Academia Isolamento B Plano E2E' });
+      const academiaA = await createAcademiaFixture(prisma, {
+        nome: 'Academia Isolamento A Plano E2E',
+      });
+      const academiaB = await createAcademiaFixture(prisma, {
+        nome: 'Academia Isolamento B Plano E2E',
+      });
       const tokenA = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academiaA.id);
       const tokenB = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academiaB.id);
 
@@ -273,7 +289,9 @@ describe('Planos (e2e)', () => {
     });
 
     it('pagina corretamente (pageSize pequeno)', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Paginacao Plano E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Paginacao Plano E2E',
+      });
       const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
 
       for (const nome of ['Plano Paginado 1', 'Plano Paginado 2']) {
@@ -302,7 +320,9 @@ describe('Planos (e2e)', () => {
 
   describe('Soft delete', () => {
     it('DELETE não remove fisicamente — some da listagem mas continua no banco com deletedAt', async () => {
-      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Soft Delete Plano E2E' });
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Soft Delete Plano E2E',
+      });
       const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
 
       const criado = await request(app.getHttpServer())

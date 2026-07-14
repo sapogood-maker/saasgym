@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction, Matricula, MatriculaStatus, Prisma } from '@prisma/client';
+import { AuditAction, MatriculaStatus, Prisma } from '@prisma/client';
 import { CreateMatriculaDto } from './dto/create-matricula.dto';
 import { UpdateMatriculaDto } from './dto/update-matricula.dto';
 import { TrancarMatriculaDto } from './dto/trancar-matricula.dto';
@@ -16,7 +16,29 @@ import { diasEntre, somarDias, somarPeriodicidade } from './matriculas.util';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FileUploadService } from '../../storage/file-upload.service';
 import { AuditService } from '../audit/audit.service';
+
+/// Projeção de leitura pro frontend renderizar a lista sem N+1 (nome do
+/// aluno/plano, foto do aluno) — motivada pela Lista de Matrículas (MS3),
+/// não uma mudança de regra de negócio. Usada em toda query que alimenta
+/// `toResponse` (create/list/findOrThrow/update/trancar/reativar/cancelar/
+/// renovar); o `update` que só encerra a matrícula anterior dentro de
+/// `renovar()` não precisa, pois seu retorno é descartado. `fotoArquivo`
+/// (não um `fotoUrl` escalar) porque é assim que Aluno guarda a foto — a
+/// URL de fato só existe depois de resolvida pelo StorageProvider, mesmo
+/// padrão de AlunosService.toResponse.
+const alunoResumoSelect = {
+  nome: true,
+  fotoArquivo: { select: { caminho: true } },
+} satisfies Prisma.AlunoSelect;
+
+const matriculaInclude = {
+  aluno: { select: alunoResumoSelect },
+  plano: { select: { nome: true } },
+} satisfies Prisma.MatriculaInclude;
+
+type MatriculaComRelacoes = Prisma.MatriculaGetPayload<{ include: typeof matriculaInclude }>;
 
 /// Núcleo comercial do ERP — liga Aluno a Plano por um período. Ver
 /// docs/16-modulo-2-matriculas-analise.md para a análise de domínio
@@ -36,6 +58,7 @@ export class MatriculasService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly tenantContext: TenantContextService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async create(dto: CreateMatriculaDto, meta: RequestMetadata = {}): Promise<MatriculaResponseDto> {
@@ -44,6 +67,7 @@ export class MatriculasService {
 
     const aluno = await this.prisma.forTenant().aluno.findFirst({
       where: { id: dto.alunoId, deletedAt: null },
+      include: { fotoArquivo: { select: { caminho: true } } },
     });
     if (!aluno) {
       throw new NotFoundException('Aluno não encontrado');
@@ -87,7 +111,13 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(matricula);
+    // aluno/plano já foram buscados acima pra validar existência — reaproveita
+    // em vez de pedir o include numa segunda ida ao banco.
+    return this.toResponse({
+      ...matricula,
+      aluno: { nome: aluno.nome, fotoArquivo: aluno.fotoArquivo },
+      plano: { nome: plano.nome },
+    });
   }
 
   async list(query: ListMatriculasQueryDto): Promise<PaginatedMatriculasResponseDto> {
@@ -101,10 +131,14 @@ export class MatriculasService {
     if (query.status) {
       where.status = query.status;
     }
+    if (query.search) {
+      where.aluno = { nome: { contains: query.search, mode: 'insensitive' } };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.forTenant().matricula.findMany({
         where,
+        include: matriculaInclude,
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
         orderBy: { createdAt: 'desc' },
@@ -113,7 +147,7 @@ export class MatriculasService {
     ]);
 
     return {
-      items: items.map((matricula) => this.toResponse(matricula)),
+      items: await Promise.all(items.map((matricula) => this.toResponse(matricula))),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -143,7 +177,9 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(matricula);
+    // aluno/plano não mudam nesta operação — reaproveita o que `findOrThrow`
+    // já trouxe em vez de um include redundante neste `update`.
+    return this.toResponse({ ...matricula, aluno: atual.aluno, plano: atual.plano });
   }
 
   async trancar(
@@ -174,7 +210,7 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(matricula);
+    return this.toResponse({ ...matricula, aluno: atual.aluno, plano: atual.plano });
   }
 
   /// Reativar soma os dias em que a matrícula ficou congelada de volta a
@@ -208,7 +244,7 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(matricula);
+    return this.toResponse({ ...matricula, aluno: atual.aluno, plano: atual.plano });
   }
 
   async cancelar(
@@ -244,7 +280,7 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(matricula);
+    return this.toResponse({ ...matricula, aluno: atual.aluno, plano: atual.plano });
   }
 
   /// Upgrade/downgrade/renovação são sempre a mesma operação: encerrar a
@@ -322,7 +358,7 @@ export class MatriculasService {
       ...meta,
     });
 
-    return this.toResponse(nova);
+    return this.toResponse({ ...nova, aluno: atual.aluno, plano: { nome: plano.nome } });
   }
 
   /// Reservado a correção de erro de cadastro — cancelamento de verdade é
@@ -356,7 +392,7 @@ export class MatriculasService {
     }
   }
 
-  private garantirNaoTerminal(matricula: Matricula): void {
+  private garantirNaoTerminal(matricula: MatriculaComRelacoes): void {
     if (
       matricula.status === MatriculaStatus.CANCELADA ||
       matricula.status === MatriculaStatus.ENCERRADA
@@ -367,21 +403,26 @@ export class MatriculasService {
     }
   }
 
-  private async findOrThrow(id: string): Promise<Matricula> {
+  private async findOrThrow(id: string): Promise<MatriculaComRelacoes> {
     const matricula = await this.prisma
       .forTenant()
-      .matricula.findFirst({ where: { id, deletedAt: null } });
+      .matricula.findFirst({ where: { id, deletedAt: null }, include: matriculaInclude });
     if (!matricula) {
       throw new NotFoundException('Matrícula não encontrada');
     }
     return matricula;
   }
 
-  private toResponse(matricula: Matricula): MatriculaResponseDto {
+  private async toResponse(matricula: MatriculaComRelacoes): Promise<MatriculaResponseDto> {
     return {
       id: matricula.id,
       alunoId: matricula.alunoId,
+      alunoNome: matricula.aluno.nome,
+      alunoFotoUrl: matricula.aluno.fotoArquivo
+        ? await this.fileUploadService.resolveUrl(matricula.aluno.fotoArquivo.caminho)
+        : null,
       planoId: matricula.planoId,
+      planoNome: matricula.plano.nome,
       createdByUserId: matricula.createdByUserId,
       valor: Number(matricula.valor),
       diaVencimento: matricula.diaVencimento,

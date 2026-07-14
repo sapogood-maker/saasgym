@@ -153,21 +153,24 @@ class _NotificationsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        hoverColor: colors.cardRaised,
-        onTap: () => _showComingSoonPopover(
-          context,
-          icon: AppIcons.bell,
-          title: 'Notificações',
-          sprintTag: 'EM DESENVOLVIMENTO',
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Icon(AppIcons.bell, size: 18, color: colors.textMuted),
+    return Tooltip(
+      message: 'Notificações',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          hoverColor: colors.cardRaised,
+          onTap: () => _showComingSoonPopover(
+            context,
+            icon: AppIcons.bell,
+            title: 'Notificações',
+            sprintTag: 'EM DESENVOLVIMENTO',
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Icon(AppIcons.bell, size: 18, color: colors.textMuted),
+          ),
         ),
       ),
     );

@@ -41,7 +41,7 @@ class AppTextField extends FormField<String> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
-               return _FocusTrackingField(
+               return AppFieldFocusTracker(
                  builder: (isFocused) => AppFieldChrome(
                    label: label,
                    errorText: field.errorText,
@@ -78,27 +78,4 @@ class AppTextField extends FormField<String> {
 
   @override
   FormFieldState<String> createState() => FormFieldState<String>();
-}
-
-/// Rastreia foco pra acender a borda no tom de marca — sem isso, o
-/// `AppFieldChrome` nunca saberia que o `TextField` interno ganhou foco.
-class _FocusTrackingField extends StatefulWidget {
-  final Widget Function(bool isFocused) builder;
-
-  const _FocusTrackingField({required this.builder});
-
-  @override
-  State<_FocusTrackingField> createState() => _FocusTrackingFieldState();
-}
-
-class _FocusTrackingFieldState extends State<_FocusTrackingField> {
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (focused) => setState(() => _isFocused = focused),
-      child: widget.builder(_isFocused),
-    );
-  }
 }

@@ -11,6 +11,8 @@ import { AlunosModule } from './modules/alunos/alunos.module';
 import { ProfessoresModule } from './modules/professores/professores.module';
 import { PlanosModule } from './modules/planos/planos.module';
 import { MatriculasModule } from './modules/matriculas/matriculas.module';
+import { FinanceiroModule } from './modules/financeiro/financeiro.module';
+import { AgendaModule } from './modules/agenda/agenda.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UsersModule } from './modules/users/users.module';
 import { TenantContextModule } from './common/context/tenant-context.module';
@@ -36,6 +38,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     ProfessoresModule,
     PlanosModule,
     MatriculasModule,
+    FinanceiroModule,
+    AgendaModule,
     DashboardModule,
     UsersModule,
   ],

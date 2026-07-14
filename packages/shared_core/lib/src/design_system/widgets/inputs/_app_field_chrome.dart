@@ -113,3 +113,29 @@ class AppFieldChrome extends StatelessWidget {
     );
   }
 }
+
+/// Rastreia foco pra acender a borda do [AppFieldChrome] no tom de marca —
+/// sem isso, a casca nunca saberia que o campo interno ganhou foco. Extraído
+/// de `AppTextField` (único que já fazia isso) na Sprint de Consolidação do
+/// Módulo 4, pra [AppSelect]/[AppDateField] passarem a ter o mesmo estado
+/// de foco visível (achado de inconsistência entre os 3 campos).
+class AppFieldFocusTracker extends StatefulWidget {
+  final Widget Function(bool isFocused) builder;
+
+  const AppFieldFocusTracker({super.key, required this.builder});
+
+  @override
+  State<AppFieldFocusTracker> createState() => _AppFieldFocusTrackerState();
+}
+
+class _AppFieldFocusTrackerState extends State<AppFieldFocusTracker> {
+  bool _isFocused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      child: widget.builder(_isFocused),
+    );
+  }
+}

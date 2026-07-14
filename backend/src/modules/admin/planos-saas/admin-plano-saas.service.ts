@@ -3,6 +3,7 @@ import { AuditAction, PlanoSaas, Prisma } from '@prisma/client';
 import { CreatePlanoSaasDto } from './dto/create-plano-saas.dto';
 import { UpdatePlanoSaasDto } from './dto/update-plano-saas.dto';
 import { TenantContextService } from '../../../common/context/tenant-context.service';
+import { RequestMetadata } from '../../../common/utils/request-metadata';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AuditService } from '../../audit/audit.service';
 
@@ -17,7 +18,7 @@ export class AdminPlanoSaasService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  async create(dto: CreatePlanoSaasDto): Promise<PlanoSaas> {
+  async create(dto: CreatePlanoSaasDto, meta: RequestMetadata = {}): Promise<PlanoSaas> {
     const existente = await this.prisma.planoSaas.findUnique({ where: { nome: dto.nome } });
     if (existente) {
       throw new ConflictException(`Já existe um plano chamado "${dto.nome}"`);
@@ -31,6 +32,7 @@ export class AdminPlanoSaasService {
       action: AuditAction.PLANO_SAAS_CREATED,
       userId: this.tenantContext.getUserId(),
       metadata: { planoSaasId: plano.id, nome: plano.nome },
+      ...meta,
     });
 
     return plano;
@@ -48,7 +50,11 @@ export class AdminPlanoSaasService {
     return plano;
   }
 
-  async update(id: string, dto: UpdatePlanoSaasDto): Promise<PlanoSaas> {
+  async update(
+    id: string,
+    dto: UpdatePlanoSaasDto,
+    meta: RequestMetadata = {},
+  ): Promise<PlanoSaas> {
     await this.findOne(id);
 
     const plano = await this.prisma.planoSaas.update({
@@ -60,6 +66,7 @@ export class AdminPlanoSaasService {
       action: AuditAction.PLANO_SAAS_UPDATED,
       userId: this.tenantContext.getUserId(),
       metadata: { planoSaasId: id, camposAlterados: Object.keys(dto) },
+      ...meta,
     });
 
     return plano;

@@ -45,7 +45,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
       _carregar();
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
     } finally {
       if (mounted) {
@@ -74,7 +74,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
       }
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
       if (mounted) {
         setState(() => _removendo = false);
@@ -238,7 +238,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
             icon: AppIcons.calendar,
             title: 'Aulas e turmas do professor',
             description: 'Turmas, horários e alunos vinculados.',
-            sprintTag: 'SPRINT 9 · AGENDA',
+            sprintTag: 'MÓDULO 4 · MS6',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -248,7 +248,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
             icon: AppIcons.finance,
             title: 'Pagamentos e comissões',
             description: 'Histórico de pagamentos ao professor.',
-            sprintTag: 'SPRINT 6 · FINANCEIRO',
+            sprintTag: 'MÓDULO 3 · FINANCEIRO',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -307,11 +307,3 @@ class _ProfessorPainelSkeleton extends StatelessWidget {
   }
 }
 
-String _mensagemErro(DioException e) {
-  final data = e.response?.data;
-  if (data is Map && data['message'] != null) {
-    final message = data['message'];
-    return message is List ? message.join(', ') : message.toString();
-  }
-  return 'Não foi possível concluir a operação.';
-}

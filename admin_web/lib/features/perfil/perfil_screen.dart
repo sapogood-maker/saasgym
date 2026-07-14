@@ -68,7 +68,7 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
     } finally {
       if (mounted) {
@@ -98,7 +98,7 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
     } finally {
       if (mounted) {
@@ -206,14 +206,6 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
   }
 }
 
-String _mensagemErro(DioException e) {
-  final data = e.response?.data;
-  if (data is Map && data['message'] != null) {
-    final message = data['message'];
-    return message is List ? message.join(', ') : message.toString();
-  }
-  return 'Não foi possível concluir a operação.';
-}
 
 class _TrocarSenhaForm extends ConsumerStatefulWidget {
   const _TrocarSenhaForm();
@@ -260,7 +252,7 @@ class _TrocarSenhaFormState extends ConsumerState<_TrocarSenhaForm> {
         context.go('/login');
       }
     } on DioException catch (e) {
-      setState(() => _erro = _mensagemErro(e));
+      setState(() => _erro = mensagemErroApi(e));
     } finally {
       if (mounted) {
         setState(() => _salvando = false);

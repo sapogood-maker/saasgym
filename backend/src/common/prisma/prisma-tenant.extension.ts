@@ -3,11 +3,26 @@ import { TenantContextService } from '../context/tenant-context.service';
 
 /// Models tenant-scoped que devem ser filtrados automaticamente por
 /// academiaId. `Aluno`/`Professor` entraram no Sprint 3, `Plano` no
-/// Módulo 1, `Matricula` no Módulo 2 — exatamente a mudança prevista
-/// desde o Sprint 1 (adicionar um model à lista, sem tocar na lógica
-/// abaixo). Próximas entidades de negócio (Agenda, Financeiro...) entram
-/// do mesmo jeito.
-const TENANT_SCOPED_MODELS = new Set(['User', 'Aluno', 'Professor', 'Plano', 'Matricula']);
+/// Módulo 1, `Matricula` no Módulo 2, `Mensalidade`/`Lancamento` no
+/// Módulo 3, `Modalidade`/`Turma`/`Recorrencia`/`Aula`/`TurmaAluno`/
+/// `AulaAluno`/`Feriado` no Módulo 4 — exatamente a mudança prevista desde
+/// o Sprint 1 (adicionar um model à lista, sem tocar na lógica abaixo).
+const TENANT_SCOPED_MODELS = new Set([
+  'User',
+  'Aluno',
+  'Professor',
+  'Plano',
+  'Matricula',
+  'Mensalidade',
+  'Lancamento',
+  'Modalidade',
+  'Turma',
+  'Recorrencia',
+  'Aula',
+  'TurmaAluno',
+  'AulaAluno',
+  'Feriado',
+]);
 
 const WHERE_OPERATIONS = new Set([
   'findFirst',

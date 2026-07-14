@@ -8,8 +8,17 @@ export class MatriculaResponseDto {
   @ApiProperty()
   alunoId!: string;
 
+  @ApiProperty({ description: 'Projeção de leitura — evita N+1 na tela de listagem' })
+  alunoNome!: string;
+
+  @ApiProperty({ nullable: true })
+  alunoFotoUrl!: string | null;
+
   @ApiProperty()
   planoId!: string;
+
+  @ApiProperty({ description: 'Projeção de leitura — evita N+1 na tela de listagem' })
+  planoNome!: string;
 
   @ApiProperty()
   createdByUserId!: string;

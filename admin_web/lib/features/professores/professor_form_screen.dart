@@ -65,7 +65,7 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
       _observacoesController.text = professor.observacoes ?? '';
       _fotoUrlExistente = professor.fotoUrl;
     } on DioException catch (e) {
-      _erroCarregamento = _mensagemErro(e);
+      _erroCarregamento = mensagemErroApi(e);
     } finally {
       if (mounted) {
         setState(() => _carregando = false);
@@ -121,7 +121,7 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
         context.pop(true);
       }
     } on DioException catch (e) {
-      setState(() => _erroSalvar = _mensagemErro(e));
+      setState(() => _erroSalvar = mensagemErroApi(e));
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -272,11 +272,3 @@ class _ProfessorFormSkeleton extends StatelessWidget {
   }
 }
 
-String _mensagemErro(DioException e) {
-  final data = e.response?.data;
-  if (data is Map && data['message'] != null) {
-    final message = data['message'];
-    return message is List ? message.join(', ') : message.toString();
-  }
-  return 'Não foi possível concluir a operação.';
-}

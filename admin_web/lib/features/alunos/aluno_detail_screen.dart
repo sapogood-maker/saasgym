@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
 /// Painel de detalhe do aluno — referência de composição para todo painel
@@ -47,7 +46,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
       _carregar();
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
     } finally {
       if (mounted) {
@@ -76,7 +75,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
       }
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_mensagemErro(e))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
       }
       if (mounted) {
         setState(() => _removendo = false);
@@ -217,7 +216,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
                 AppDetailRow(label: 'RG', value: aluno.rg),
                 AppDetailRow(
                   label: 'Data de nascimento',
-                  value: DateFormat('dd/MM/yyyy').format(aluno.dataNascimento),
+                  value: dataCurtaFormat.format(aluno.dataNascimento),
                 ),
                 AppDetailRow(label: 'Sexo', value: _sexoLabel(aluno.sexo)),
               ]),
@@ -265,7 +264,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
             icon: AppIcons.enrollment,
             title: 'Plano e matrícula do aluno',
             description: 'Vínculo com plano, data de início e vencimento.',
-            sprintTag: 'SPRINT 5 · MATRÍCULAS',
+            sprintTag: 'MÓDULO 2 · MATRÍCULAS',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -275,7 +274,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
             icon: AppIcons.finance,
             title: 'Mensalidades e pagamentos',
             description: 'Histórico de cobranças, recebimentos e inadimplência.',
-            sprintTag: 'SPRINT 6 · FINANCEIRO',
+            sprintTag: 'MÓDULO 3 · FINANCEIRO',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -285,7 +284,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
             icon: AppIcons.assessment,
             title: 'Avaliação física',
             description: 'Peso, altura, IMC, dobras e medidas ao longo do tempo.',
-            sprintTag: 'SPRINT 7 · AVALIAÇÃO FÍSICA',
+            sprintTag: 'MÓDULO 5 · AVALIAÇÃO FÍSICA',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -295,7 +294,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
             icon: AppIcons.attendance,
             title: 'Presença em aulas',
             description: 'Check-ins e frequência em aulas e treinos.',
-            sprintTag: 'SPRINT 9 · AGENDA',
+            sprintTag: 'MÓDULO 4 · MS8',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -305,7 +304,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
             icon: AppIcons.workout,
             title: 'Fichas de treino',
             description: 'Exercícios, séries, repetições e carga.',
-            sprintTag: 'SPRINT 8 · TREINOS',
+            sprintTag: 'EM BREVE',
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -375,11 +374,3 @@ String _sexoLabel(Sexo sexo) {
   }
 }
 
-String _mensagemErro(DioException e) {
-  final data = e.response?.data;
-  if (data is Map && data['message'] != null) {
-    final message = data['message'];
-    return message is List ? message.join(', ') : message.toString();
-  }
-  return 'Não foi possível concluir a operação.';
-}

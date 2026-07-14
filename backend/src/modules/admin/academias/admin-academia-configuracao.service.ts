@@ -3,6 +3,7 @@ import { AcademiaConfiguracao, Arquivo, AuditAction, Prisma } from '@prisma/clie
 import { AcademiaConfiguracaoResponseDto } from './dto/academia-configuracao-response.dto';
 import { UpdateAcademiaConfiguracaoDto } from './dto/update-academia-configuracao.dto';
 import { TenantContextService } from '../../../common/context/tenant-context.service';
+import { RequestMetadata } from '../../../common/utils/request-metadata';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FileUploadService, UploadedFileInput } from '../../../storage/file-upload.service';
 import { AuditService } from '../../audit/audit.service';
@@ -31,6 +32,7 @@ export class AdminAcademiaConfiguracaoService {
   async update(
     academiaId: string,
     dto: UpdateAcademiaConfiguracaoDto,
+    meta: RequestMetadata = {},
   ): Promise<AcademiaConfiguracaoResponseDto> {
     await this.findOrThrow(academiaId);
 
@@ -49,6 +51,7 @@ export class AdminAcademiaConfiguracaoService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { camposAlterados: Object.keys(dto) },
+      ...meta,
     });
 
     return this.toResponse(atualizada);
@@ -60,6 +63,7 @@ export class AdminAcademiaConfiguracaoService {
   async updateLogo(
     academiaId: string,
     file: UploadedFileInput,
+    meta: RequestMetadata = {},
   ): Promise<AcademiaConfiguracaoResponseDto> {
     const configuracao = await this.findOrThrow(academiaId);
 
@@ -80,6 +84,7 @@ export class AdminAcademiaConfiguracaoService {
       academiaId,
       userId: this.tenantContext.getUserId(),
       metadata: { camposAlterados: ['logo'] },
+      ...meta,
     });
 
     return this.toResponse(atualizada);

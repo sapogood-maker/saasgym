@@ -47,6 +47,7 @@ class AppPagination extends StatelessWidget {
       children: [
         _StepButton(
           icon: AppIcons.chevronLeft,
+          tooltip: 'Página anterior',
           enabled: page > 1,
           onTap: () => onPageChanged(page - 1),
         ),
@@ -65,6 +66,7 @@ class AppPagination extends StatelessWidget {
         const SizedBox(width: AppSpacing.md),
         _StepButton(
           icon: AppIcons.chevronRight,
+          tooltip: 'Próxima página',
           enabled: page < totalPages,
           onTap: () => onPageChanged(page + 1),
         ),
@@ -75,30 +77,39 @@ class AppPagination extends StatelessWidget {
 
 class _StepButton extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final bool enabled;
   final VoidCallback onTap;
 
-  const _StepButton({required this.icon, required this.enabled, required this.onTap});
+  const _StepButton({
+    required this.icon,
+    required this.tooltip,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: InkWell(
-        onTap: enabled ? onTap : null,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        hoverColor: colors.cardRaised,
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.border),
-            borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          hoverColor: colors.cardRaised,
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.border),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 15, color: enabled ? colors.textMuted : colors.textFaint),
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: 15, color: enabled ? colors.textMuted : colors.textFaint),
         ),
       ),
     );
