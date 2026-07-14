@@ -5,6 +5,7 @@ import 'package:shared_core/shared_core.dart';
 
 import '../features/agenda/calendar_screen.dart';
 import '../features/agenda/modalidades_screen.dart';
+import '../features/agenda/reposicoes_screen.dart';
 import '../features/agenda/turma_detail_screen.dart';
 import '../features/agenda/turma_form_screen.dart';
 import '../features/agenda/turmas_screen.dart';
@@ -122,6 +123,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/agenda/calendario',
             builder: (context, state) => const CalendarScreen(),
+          ),
+          GoRoute(
+            path: '/agenda/reposicoes',
+            builder: (context, state) => const ReposicoesScreen(),
           ),
           GoRoute(
             path: '/perfil',

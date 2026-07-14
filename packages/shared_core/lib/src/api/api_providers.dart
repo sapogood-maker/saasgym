@@ -6,16 +6,19 @@ import '../agenda/modalidades_api.dart';
 import '../agenda/aula_alunos_api.dart';
 import '../agenda/aulas_api.dart';
 import '../agenda/recorrencias_api.dart';
+import '../agenda/solicitacoes_reposicao_api.dart';
 import '../agenda/turma_alunos_api.dart';
 import '../agenda/turmas_api.dart';
 import '../alunos/alunos_api.dart';
 import '../auth/auth_api.dart';
+import '../avaliacoes_fisicas/avaliacoes_fisicas_api.dart';
 import '../auth/auth_session.dart';
 import '../dashboard/dashboard_api.dart';
 import '../financeiro/dashboard_financeiro_api.dart';
 import '../financeiro/lancamentos_api.dart';
 import '../financeiro/mensalidades_api.dart';
 import '../matriculas/matriculas_api.dart';
+import '../notifications/notificacoes_api.dart';
 import '../planos/planos_api.dart';
 import '../professores/professores_api.dart';
 import '../users/users_api.dart';
@@ -74,6 +77,10 @@ final matriculasApiProvider = Provider<MatriculasApi>(
   (ref) => MatriculasApi(ref.watch(apiClientProvider).dio),
 );
 
+final notificacoesApiProvider = Provider<NotificacoesApi>(
+  (ref) => NotificacoesApi(ref.watch(apiClientProvider).dio),
+);
+
 final mensalidadesApiProvider = Provider<MensalidadesApi>(
   (ref) => MensalidadesApi(ref.watch(apiClientProvider).dio),
 );
@@ -112,4 +119,12 @@ final aulasApiProvider = Provider<AulasApi>(
 
 final aulaAlunosApiProvider = Provider<AulaAlunosApi>(
   (ref) => AulaAlunosApi(ref.watch(apiClientProvider).dio),
+);
+
+final avaliacoesFisicasApiProvider = Provider<AvaliacoesFisicasApi>(
+  (ref) => AvaliacoesFisicasApi(ref.watch(apiClientProvider).dio),
+);
+
+final solicitacoesReposicaoApiProvider = Provider<SolicitacoesReposicaoApi>(
+  (ref) => SolicitacoesReposicaoApi(ref.watch(apiClientProvider).dio),
 );

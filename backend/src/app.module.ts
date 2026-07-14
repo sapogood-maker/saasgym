@@ -13,8 +13,10 @@ import { PlanosModule } from './modules/planos/planos.module';
 import { MatriculasModule } from './modules/matriculas/matriculas.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { AgendaModule } from './modules/agenda/agenda.module';
+import { AvaliacoesFisicasModule } from './modules/avaliacoes-fisicas/avaliacoes-fisicas.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { TenantContextModule } from './common/context/tenant-context.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -40,8 +42,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     MatriculasModule,
     FinanceiroModule,
     AgendaModule,
+    AvaliacoesFisicasModule,
     DashboardModule,
     UsersModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

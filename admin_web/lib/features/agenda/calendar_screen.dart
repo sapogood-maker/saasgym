@@ -829,6 +829,26 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
     }
   }
 
+  /// Origem elegível pro lado do frontend (docs/21, decisão 2) — mesma
+  /// regra validada de novo no backend, que é a autoridade final (409/400
+  /// se algo mudou entre o carregamento da lista e o clique).
+  bool _podeSolicitarReposicao(AulaAluno aulaAluno, bool aulaCancelada) {
+    if (aulaCancelada) return true;
+    return aulaAluno.presenca == PresencaStatus.ausente || aulaAluno.presenca == PresencaStatus.justificada;
+  }
+
+  Future<void> _abrirNovaSolicitacao(AulaAluno aulaAluno) async {
+    final criada = await showDialog<bool>(
+      context: context,
+      builder: (_) => _NovaSolicitacaoReposicaoDialog(aulaAluno: aulaAluno),
+    );
+    if (criada == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Solicitação de reposição registrada para ${aulaAluno.alunoNome}.')),
+      );
+    }
+  }
+
   Future<void> _cancelar() async {
     setState(() => _erro = null);
     setState(() => _salvando = true);
@@ -972,6 +992,18 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
               variant: AppButtonVariant.secondary,
               onPressed: _abrirFrequencia,
             ),
+          // Sprint 6 (Agenda Avançada) — origem de reposição também pode
+          // ser uma aula cancelada (docs/21, decisão 2), que nunca passa
+          // por `_aulaRealizada` (status != agendada). Reaproveita a mesma
+          // view/mecanismo de "Registrar frequência" — dentro dela, o
+          // seletor de presença some quando a aula está cancelada.
+          if (!agendada)
+            AppButton(
+              label: 'Ver alunos / Solicitar reposição',
+              icon: AppIcons.reposicao,
+              variant: AppButtonVariant.secondary,
+              onPressed: _abrirFrequencia,
+            ),
           AppButton(
             label: 'Remover',
             icon: AppIcons.trash,
@@ -1056,12 +1088,19 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
     ];
   }
 
-  /// Frequência (MS8) — só chega aqui se `_aulaRealizada(aula)`. Cada
-  /// linha registra/altera a presença com um único `AppSelect` (mesma
-  /// operação pras duas coisas, docs/18 "Frequência — invariante 4"),
-  /// sem botão de salvar por linha — muda no `onChanged`, como uma
-  /// planilha de chamada.
+  /// Frequência (MS8) — chega aqui se `_aulaRealizada(aula)` (registrar
+  /// presença) **ou** se `aula.status == cancelada` (Sprint 6, docs/21
+  /// decisão 2 — origem de reposição também pode ser uma aula cancelada).
+  /// Cada linha registra/altera a presença com um único `AppSelect` (mesma
+  /// operação pras duas coisas, docs/18 "Frequência — invariante 4"), sem
+  /// botão de salvar por linha — muda no `onChanged`, como uma planilha de
+  /// chamada. O seletor de presença só aparece quando a aula não está
+  /// cancelada (não faz sentido marcar presença de algo que nunca
+  /// aconteceu); "Solicitar reposição" aparece quando a aula está
+  /// cancelada ou o aluno já tem falta/falta justificada marcada.
   List<Widget> _viewFrequencia(AppColorScheme colors) {
+    final aulaCancelada = widget.aula.status == AulaStatus.cancelada;
+
     return [
       FutureBuilder<List<AulaAluno>>(
         future: _alunosFuture,
@@ -1100,20 +1139,29 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
                         child: Text(alunos[i].alunoNome, style: AppTypography.bodyMedium.copyWith(color: colors.text)),
                       ),
                       const SizedBox(width: AppSpacing.md),
-                      SizedBox(
-                        width: 170,
-                        child: AppSelect<PresencaStatus?>(
-                          label: 'Presença',
-                          value: alunos[i].presenca,
-                          options: const [
-                            AppSelectOption(value: null, label: 'Não marcada'),
-                            AppSelectOption(value: PresencaStatus.presente, label: 'Presente'),
-                            AppSelectOption(value: PresencaStatus.ausente, label: 'Falta'),
-                            AppSelectOption(value: PresencaStatus.justificada, label: 'Falta justificada'),
-                          ],
-                          onChanged: (v) => _registrarPresenca(alunos[i], v),
+                      if (_podeSolicitarReposicao(alunos[i], aulaCancelada))
+                        IconButton(
+                          icon: Icon(AppIcons.reposicao, size: 18, color: colors.textMuted),
+                          tooltip: 'Solicitar reposição',
+                          onPressed: () => _abrirNovaSolicitacao(alunos[i]),
                         ),
-                      ),
+                      if (!aulaCancelada) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        SizedBox(
+                          width: 170,
+                          child: AppSelect<PresencaStatus?>(
+                            label: 'Presença',
+                            value: alunos[i].presenca,
+                            options: const [
+                              AppSelectOption(value: null, label: 'Não marcada'),
+                              AppSelectOption(value: PresencaStatus.presente, label: 'Presente'),
+                              AppSelectOption(value: PresencaStatus.ausente, label: 'Falta'),
+                              AppSelectOption(value: PresencaStatus.justificada, label: 'Falta justificada'),
+                            ],
+                            onChanged: (v) => _registrarPresenca(alunos[i], v),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1136,6 +1184,94 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
         ),
       ),
     ];
+  }
+}
+
+/// Sprint 6 (Agenda Avançada) — a solicitação nasce só com a aula de
+/// origem perdida (docs/21, decisão 3); sem escolher destino aqui — a
+/// recepção escolhe na aprovação, na tela "Reposições".
+class _NovaSolicitacaoReposicaoDialog extends ConsumerStatefulWidget {
+  const _NovaSolicitacaoReposicaoDialog({required this.aulaAluno});
+
+  final AulaAluno aulaAluno;
+
+  @override
+  ConsumerState<_NovaSolicitacaoReposicaoDialog> createState() => _NovaSolicitacaoReposicaoDialogState();
+}
+
+class _NovaSolicitacaoReposicaoDialogState extends ConsumerState<_NovaSolicitacaoReposicaoDialog> {
+  final _observacoesController = TextEditingController();
+  bool _salvando = false;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _observacoesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirmar() async {
+    setState(() => _erro = null);
+    setState(() => _salvando = true);
+    try {
+      await ref.read(solicitacoesReposicaoApiProvider).criar(
+            widget.aulaAluno.id,
+            observacoes: _observacoesController.text.trim().isEmpty ? null : _observacoesController.text.trim(),
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      setState(() => _erro = mensagemErroApi(e));
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Dialog(
+      backgroundColor: colors.card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Solicitar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '${widget.aulaAluno.alunoNome} — a aula de destino é escolhida na aprovação, na tela "Reposições".',
+                style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppTextField(label: 'Observações (opcional)', controller: _observacoesController, maxLines: 2),
+              if (_erro != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppFormErrorBanner(_erro!),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  AppButton(
+                    label: 'Cancelar',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppButton(label: 'Solicitar', loading: _salvando, onPressed: _confirmar),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

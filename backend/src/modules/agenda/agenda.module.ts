@@ -14,14 +14,20 @@ import { AulasCalendarioController } from './aulas/aulas-calendario.controller';
 import { AulasService } from './aulas/aulas.service';
 import { AulaAlunosController } from './aula-alunos/aula-alunos.controller';
 import { AulaAlunosService } from './aula-alunos/aula-alunos.service';
+import { SolicitacoesReposicaoController } from './solicitacoes-reposicao/solicitacoes-reposicao.controller';
+import { SolicitacoesReposicaoService } from './solicitacoes-reposicao/solicitacoes-reposicao.service';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 /// Agrupa Modalidades/Feriados (MS1) + Turmas (MS3) + Recorrencias (MS4) +
-/// TurmaAlunos (MS5) + Aulas/Calendário (MS6/MS7) + Frequência (MS8) —
-/// mesmo padrão de FinanceiroModule agregando mensalidades/lancamentos.
-/// Subpastas são só organização de arquivo, não módulos Nest próprios.
+/// TurmaAlunos (MS5) + Aulas/Calendário (MS6/MS7) + Frequência (MS8) +
+/// Solicitações de Reposição (Sprint 6, Agenda Avançada) — mesmo padrão de
+/// FinanceiroModule agregando mensalidades/lancamentos. Subpastas são só
+/// organização de arquivo, não módulos Nest próprios. Importa
+/// NotificationsModule só pra injetar NOTIFICATION_PROVIDER em
+/// SolicitacoesReposicaoService — nenhum outro service da Agenda usa isso.
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, NotificationsModule],
   controllers: [
     ModalidadesController,
     FeriadosController,
@@ -31,6 +37,7 @@ import { AuditModule } from '../audit/audit.module';
     AulasController,
     AulasCalendarioController,
     AulaAlunosController,
+    SolicitacoesReposicaoController,
   ],
   providers: [
     ModalidadesService,
@@ -40,6 +47,7 @@ import { AuditModule } from '../audit/audit.module';
     TurmaAlunosService,
     AulasService,
     AulaAlunosService,
+    SolicitacoesReposicaoService,
   ],
 })
 export class AgendaModule {}

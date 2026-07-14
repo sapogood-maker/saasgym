@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
 /// Painel de detalhe do aluno — referência de composição para todo painel
@@ -278,15 +279,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          title: 'Avaliações',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.assessment,
-            title: 'Avaliação física',
-            description: 'Peso, altura, IMC, dobras e medidas ao longo do tempo.',
-            sprintTag: 'MÓDULO 5 · AVALIAÇÃO FÍSICA',
-          ),
-        ),
+        _AvaliacoesFisicasSection(alunoId: aluno.id),
         const SizedBox(height: AppSpacing.lg),
         AppCard(
           title: 'Frequência',
@@ -371,6 +364,336 @@ String _sexoLabel(Sexo sexo) {
       return 'Feminino';
     case Sexo.outro:
       return 'Outro';
+  }
+}
+
+/// Módulo 5 (Avaliação Física) — seção embutida, mesmo padrão de
+/// `_AulasSection` (TurmaDetailScreen, Módulo 4): `AvaliacaoFisica` é fato
+/// histórico imutável (docs/20, decisão 1), então cada linha só tem uma
+/// ação (remover — correção de erro de cadastro), nunca editar.
+class _AvaliacoesFisicasSection extends ConsumerStatefulWidget {
+  const _AvaliacoesFisicasSection({required this.alunoId});
+
+  final String alunoId;
+
+  @override
+  ConsumerState<_AvaliacoesFisicasSection> createState() => _AvaliacoesFisicasSectionState();
+}
+
+class _AvaliacoesFisicasSectionState extends ConsumerState<_AvaliacoesFisicasSection> {
+  Future<PaginatedResult<AvaliacaoFisica>>? _future;
+  int _pagina = 1;
+  static const _tamanhoPagina = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  void _carregar() {
+    setState(() {
+      _future = ref
+          .read(avaliacoesFisicasApiProvider)
+          .list(widget.alunoId, page: _pagina, pageSize: _tamanhoPagina);
+    });
+  }
+
+  void _irParaPagina(int pagina) {
+    setState(() => _pagina = pagina);
+    _carregar();
+  }
+
+  Future<void> _nova() async {
+    final criada = await showDialog<bool>(
+      context: context,
+      builder: (_) => _NovaAvaliacaoFisicaDialog(alunoId: widget.alunoId),
+    );
+    if (criada == true) {
+      _pagina = 1;
+      _carregar();
+    }
+  }
+
+  Future<void> _remover(AvaliacaoFisica avaliacao) async {
+    final confirmou = await AppConfirmDialog.show(
+      context,
+      variant: AppConfirmDialogVariant.danger,
+      title: 'Remover avaliação física',
+      description:
+          'Remover a avaliação de ${dataCurtaFormat.format(avaliacao.data)}? '
+          'Reservado a correção de erro de cadastro — uma avaliação nunca é editada.',
+      confirmLabel: 'Remover',
+    );
+    if (confirmou != true) return;
+
+    try {
+      await ref.read(avaliacoesFisicasApiProvider).remove(widget.alunoId, avaliacao.id);
+      _carregar();
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      title: 'Avaliações',
+      actions: [AppButton(label: 'Nova avaliação', icon: AppIcons.add, onPressed: _nova)],
+      child: FutureBuilder<PaginatedResult<AvaliacaoFisica>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LoadingSkeleton(width: double.infinity, height: 16),
+                SizedBox(height: AppSpacing.sm),
+                LoadingSkeleton(width: double.infinity, height: 16),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: AppIcons.alert,
+              title: 'Não foi possível carregar as avaliações.',
+              actionLabel: 'Tentar novamente',
+              onAction: _carregar,
+            );
+          }
+          final resultado = snapshot.data!;
+          if (resultado.items.isEmpty) {
+            return EmptyState(
+              icon: AppIcons.assessment,
+              title: 'Nenhuma avaliação registrada',
+              description: 'Peso, altura e IMC ao longo do tempo.',
+              actionLabel: 'Nova avaliação',
+              onAction: _nova,
+            );
+          }
+          final colors = context.colors;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < resultado.items.length; i++) ...[
+                if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                _AvaliacaoFisicaRow(avaliacao: resultado.items[i], onRemover: _remover),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              AppPagination(
+                page: resultado.page,
+                pageSize: resultado.pageSize,
+                total: resultado.total,
+                onPageChanged: _irParaPagina,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AvaliacaoFisicaRow extends StatelessWidget {
+  const _AvaliacaoFisicaRow({required this.avaliacao, required this.onRemover});
+
+  final AvaliacaoFisica avaliacao;
+  final ValueChanged<AvaliacaoFisica> onRemover;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(AppIcons.assessment, size: 16, color: colors.textFaint),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  dataCurtaFormat.format(avaliacao.data),
+                  style: AppTypography.titleMedium.copyWith(color: colors.text),
+                ),
+                Text(
+                  '${avaliacao.peso.toStringAsFixed(1)} kg · '
+                  '${avaliacao.altura.toStringAsFixed(0)} cm · '
+                  'IMC ${avaliacao.imc.toStringAsFixed(1)}',
+                  style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
+                ),
+                if ((avaliacao.observacoes ?? '').trim().isNotEmpty)
+                  Text(
+                    avaliacao.observacoes!,
+                    style: AppTypography.bodySmall.copyWith(color: colors.textFaint),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          IconButton(
+            icon: Icon(AppIcons.trash, size: 18, color: colors.textFaint),
+            tooltip: 'Remover avaliação',
+            onPressed: () => onRemover(avaliacao),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Diálogo de criação — data/peso/altura/observações. Sem contraparte de
+/// edição (docs/20, decisão 1) — a única forma de corrigir um erro é
+/// remover e criar de novo.
+class _NovaAvaliacaoFisicaDialog extends ConsumerStatefulWidget {
+  const _NovaAvaliacaoFisicaDialog({required this.alunoId});
+
+  final String alunoId;
+
+  @override
+  ConsumerState<_NovaAvaliacaoFisicaDialog> createState() => _NovaAvaliacaoFisicaDialogState();
+}
+
+class _NovaAvaliacaoFisicaDialogState extends ConsumerState<_NovaAvaliacaoFisicaDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _pesoController = TextEditingController();
+  final _alturaController = TextEditingController();
+  final _observacoesController = TextEditingController();
+  late DateTime _data;
+  bool _salvando = false;
+  String? _erro;
+
+  @override
+  void initState() {
+    super.initState();
+    _data = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _pesoController.dispose();
+    _alturaController.dispose();
+    _observacoesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _salvar() async {
+    setState(() => _erro = null);
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _salvando = true);
+    try {
+      await ref.read(avaliacoesFisicasApiProvider).create(
+            widget.alunoId,
+            data: DateFormat('yyyy-MM-dd').format(_data),
+            peso: double.parse(_pesoController.text.trim().replaceAll(',', '.')),
+            altura: double.parse(_alturaController.text.trim().replaceAll(',', '.')),
+            observacoes: _observacoesController.text.trim().isEmpty
+                ? null
+                : _observacoesController.text.trim(),
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      setState(() => _erro = mensagemErroApi(e));
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Dialog(
+      backgroundColor: colors.card,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: colors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nova avaliação física', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+                const SizedBox(height: AppSpacing.lg),
+                AppDateField(
+                  label: 'Data',
+                  firstDate: DateTime.now().subtract(const Duration(days: 3650)),
+                  lastDate: DateTime.now(),
+                  value: _data,
+                  onChanged: (v) => setState(() => _data = v!),
+                  validator: (v) => v == null ? 'Informe a data' : null,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Peso (kg)',
+                    hintText: '70,0',
+                    controller: _pesoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Informe o peso';
+                      final numero = double.tryParse(v.trim().replaceAll(',', '.'));
+                      if (numero == null || numero <= 0) return 'Informe um peso válido';
+                      return null;
+                    },
+                  ),
+                  AppTextField(
+                    label: 'Altura (cm)',
+                    hintText: '175',
+                    controller: _alturaController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Informe a altura';
+                      final numero = double.tryParse(v.trim().replaceAll(',', '.'));
+                      if (numero == null || numero <= 0) return 'Informe uma altura válida';
+                      return null;
+                    },
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppTextField(
+                  label: 'Observações',
+                  hintText: 'Opcional',
+                  controller: _observacoesController,
+                  maxLines: 2,
+                ),
+                if (_erro != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppFormErrorBanner(_erro!),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: 'Cancelar',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: _salvando ? null : () => Navigator.of(context).pop(null),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

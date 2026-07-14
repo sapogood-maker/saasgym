@@ -106,6 +106,11 @@ enum AuditAction {
   FERIADO_CREATED
   FERIADO_UPDATED
   FERIADO_DELETED
+  AVALIACAO_FISICA_CREATED
+  AVALIACAO_FISICA_DELETED
+  SOLICITACAO_REPOSICAO_CRIADA
+  SOLICITACAO_REPOSICAO_APROVADA
+  SOLICITACAO_REPOSICAO_REJEITADA
 }
 
 enum ArquivoCategoria {
@@ -217,6 +222,12 @@ enum PresencaStatus {
   JUSTIFICADA
 }
 
+enum SolicitacaoReposicaoStatus {
+  PENDENTE
+  APROVADA
+  REJEITADA
+}
+
 /// Tenant: cada academia cliente do SaaS.
 model Academia {
   id       String         @id @default(uuid())
@@ -251,6 +262,9 @@ model Academia {
   turmaAlunos  TurmaAluno[]
   aulaAlunos   AulaAluno[]
   feriados     Feriado[]
+  avaliacoesFisicas AvaliacaoFisica[]
+  solicitacoesReposicao SolicitacaoReposicao[]
+  notificacoes Notificacao[]
 
   @@map("academias")
 }
@@ -361,10 +375,12 @@ model Aluno {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  matriculas   Matricula[]
-  mensalidades Mensalidade[]
-  turmaAlunos  TurmaAluno[]
-  aulaAlunos   AulaAluno[]
+  matriculas       Matricula[]
+  mensalidades     Mensalidade[]
+  turmaAlunos      TurmaAluno[]
+  aulaAlunos       AulaAluno[]
+  avaliacoesFisicas AvaliacaoFisica[]
+  solicitacoesReposicao SolicitacaoReposicao[]
 
   @@unique([academiaId, cpf])
   @@index([academiaId])
@@ -736,6 +752,7 @@ model Aula {
   updatedAt DateTime  @updatedAt
 
   alunos AulaAluno[]
+  solicitacoesReposicaoComoDestino SolicitacaoReposicao[] @relation("SolicitacaoReposicaoDestino")
 
   @@unique([recorrenciaId, data]) // idempotência da geração (docs/18, regra 3)
   @@index([academiaId])
@@ -816,6 +833,9 @@ model AulaAluno {
   reposicaoDeAulaAluno   AulaAluno? @relation("Reposicao", fields: [reposicaoDeAulaAlunoId], references: [id])
   reposicaoGerada        AulaAluno? @relation("Reposicao")
 
+  solicitacoesReposicaoComoOrigem SolicitacaoReposicao[] @relation("SolicitacaoReposicaoOrigem")
+  solicitacaoReposicaoResultado   SolicitacaoReposicao?  @relation("SolicitacaoReposicaoResultado")
+
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -848,6 +868,108 @@ model Feriado {
   @@map("feriados")
 }
 
+/// Módulo 5 (Avaliação Física) — fato histórico imutável: uma vez criada,
+/// nunca é atualizada (sem peso/altura/data editáveis). Corrigir um erro de
+/// cadastro é soft delete + nova avaliação, nunca um update — mesmo
+/// princípio de `Aula`/`AulaAluno.presenca`. IMC nunca é armazenado, sempre
+/// calculado a partir de peso/altura na resposta (mesmo padrão de
+/// `Mensalidade.atrasada`). Sem vínculo com `Professor` (ainda sem login
+/// próprio) — autoria via `createdByUserId`, igual a todo outro módulo.
+/// Ver docs/20-modulo-5-avaliacao-fisica-analise.md.
+model AvaliacaoFisica {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  alunoId String
+  aluno   Aluno  @relation(fields: [alunoId], references: [id])
+
+  data        DateTime
+  peso        Decimal @db.Decimal(5, 2)
+  altura      Decimal @db.Decimal(5, 2)
+  observacoes String?
+
+  createdByUserId String
+  createdByUser   User   @relation(fields: [createdByUserId], references: [id])
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([academiaId, alunoId])
+  @@map("avaliacoes_fisicas")
+}
+
+/// Sprint 6 (Agenda Avançada) — a solicitação nasce só com a aula de
+/// origem perdida (falta ou cancelamento); `aulaDestinoId` fica nulo até a
+/// aprovação, quando a recepção escolhe o destino (docs/21, decisão 3,
+/// confirmada pelo dono do produto — revisão da proposta original).
+/// Aprovar é o único caminho que cria um `AulaAluno(tipo=REPOSICAO)` — sem
+/// atalho direto (docs/21, decisão 5).
+model SolicitacaoReposicao {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  alunoId String
+  aluno   Aluno  @relation(fields: [alunoId], references: [id])
+
+  aulaAlunoOrigemId String
+  aulaAlunoOrigem   AulaAluno @relation("SolicitacaoReposicaoOrigem", fields: [aulaAlunoOrigemId], references: [id])
+
+  aulaDestinoId String?
+  aulaDestino   Aula?  @relation("SolicitacaoReposicaoDestino", fields: [aulaDestinoId], references: [id])
+
+  aulaAlunoReposicaoId String?    @unique
+  aulaAlunoReposicao   AulaAluno? @relation("SolicitacaoReposicaoResultado", fields: [aulaAlunoReposicaoId], references: [id])
+
+  status         SolicitacaoReposicaoStatus @default(PENDENTE)
+  observacoes    String?
+  motivoRejeicao String?
+
+  createdByUserId String
+  createdByUser   User   @relation("SolicitacoesReposicaoCriadas", fields: [createdByUserId], references: [id])
+
+  decidedByUserId String?
+  decidedByUser   User?     @relation("SolicitacoesReposicaoDecididas", fields: [decidedByUserId], references: [id])
+  decidedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([academiaId, alunoId])
+  @@index([academiaId, status])
+  @@map("solicitacoes_reposicao")
+}
+
+/// Sprint 6 (Agenda Avançada) MS2 — canal interno do `NotificationProvider`
+/// (docs/21, decisão 7): a interface é desacoplada para suportar múltiplos
+/// canais futuros (e-mail/WhatsApp/push), mas só este model existe nesta
+/// sprint. Sempre dirigida a um `User` específico — nunca "toda a
+/// academia" (decisão 8); marcar como lida nunca gera `AuditLog` (decisão
+/// 10, equivalente a "ler" um registro, nunca auditado em nenhum outro
+/// lugar do sistema).
+model Notificacao {
+  id         String   @id @default(uuid())
+  academiaId String
+  academia   Academia @relation(fields: [academiaId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  titulo   String
+  mensagem String
+
+  lida   Boolean   @default(false)
+  lidaEm DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([academiaId, userId, lida])
+  @@map("notificacoes")
+}
+
 /// Identidade de login. academiaId é nulo apenas para SYSTEM_ADMIN.
 model User {
   id         String    @id @default(uuid())
@@ -868,11 +990,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens       RefreshToken[]
-  matriculasCriadas   Matricula[]
-  mensalidadesCriadas Mensalidade[]
-  lancamentosCriados  Lancamento[]
-  aulasCriadas        Aula[]
+  refreshTokens            RefreshToken[]
+  matriculasCriadas        Matricula[]
+  mensalidadesCriadas      Mensalidade[]
+  lancamentosCriados       Lancamento[]
+  aulasCriadas             Aula[]
+  avaliacoesFisicasCriadas AvaliacaoFisica[]
+  solicitacoesReposicaoCriadas  SolicitacaoReposicao[] @relation("SolicitacoesReposicaoCriadas")
+  solicitacoesReposicaoDecididas SolicitacaoReposicao[] @relation("SolicitacoesReposicaoDecididas")
+  notificacoes Notificacao[]
 
   @@index([academiaId])
   @@map("users")

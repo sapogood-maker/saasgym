@@ -11,10 +11,12 @@ import '../feedback/empty_state.dart';
 /// numa tela (para isso, usar `AppBar` comum). Composição fixa: menu
 /// (mobile) → [breadcrumb] → busca global (placeholder) → notificações.
 ///
-/// Busca e notificações ainda não têm funcionalidade real por trás (sem
-/// backend de busca/notificação hoje) — os dois são propositalmente
-/// "burros" (abrem um popover de estado vazio), preparados para ganhar
-/// comportamento real numa sprint futura sem mudar a composição do header.
+/// Busca continua sem funcionalidade real (sem backend de busca hoje) —
+/// propositalmente "burra" (abre um popover de estado vazio). Notificações
+/// ganhou dado real na Sprint 6 (MS4): o Design System só sabe exibir a
+/// contagem e delegar o toque (`onNotificationsTap`) — buscar/renderizar a
+/// lista de verdade é responsabilidade de quem usa o header (admin_web),
+/// nunca do pacote de Design System (sem dependência de API aqui).
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   /// Normalmente um [AppBreadcrumb].
   final Widget? breadcrumb;
@@ -22,7 +24,22 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   /// Quando definido, mostra o botão de menu (abre o Drawer no mobile).
   final VoidCallback? onMenuTap;
 
-  const AppHeader({super.key, this.breadcrumb, this.onMenuTap});
+  /// Total de notificações não lidas — badge no sino. Zero/nulo não mostra
+  /// nada (mesmo padrão de "nulo = sem contagem" já usado em
+  /// `capacidadeMaxima`/`quantidadeAulas`).
+  final int notificacoesNaoLidas;
+
+  /// Quando definido, substitui o popover "em desenvolvimento" padrão —
+  /// quem usa o header decide o que acontece ao tocar no sino.
+  final VoidCallback? onNotificationsTap;
+
+  const AppHeader({
+    super.key,
+    this.breadcrumb,
+    this.onMenuTap,
+    this.notificacoesNaoLidas = 0,
+    this.onNotificationsTap,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
@@ -63,7 +80,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
           else
             const _GlobalSearchPlaceholder(),
           const SizedBox(width: AppSpacing.md),
-          const _NotificationsButton(),
+          _NotificationsButton(naoLidas: notificacoesNaoLidas, onTap: onNotificationsTap),
         ],
       ),
     );
@@ -148,7 +165,10 @@ class _GlobalSearchPlaceholder extends StatelessWidget {
 }
 
 class _NotificationsButton extends StatelessWidget {
-  const _NotificationsButton();
+  final int naoLidas;
+  final VoidCallback? onTap;
+
+  const _NotificationsButton({required this.naoLidas, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -161,15 +181,40 @@ class _NotificationsButton extends StatelessWidget {
         child: InkWell(
           customBorder: const CircleBorder(),
           hoverColor: colors.cardRaised,
-          onTap: () => _showComingSoonPopover(
-            context,
-            icon: AppIcons.bell,
-            title: 'Notificações',
-            sprintTag: 'EM DESENVOLVIMENTO',
-          ),
+          onTap: onTap ??
+              () => _showComingSoonPopover(
+                    context,
+                    icon: AppIcons.bell,
+                    title: 'Notificações',
+                    sprintTag: 'EM DESENVOLVIMENTO',
+                  ),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.sm),
-            child: Icon(AppIcons.bell, size: 18, color: colors.textMuted),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(AppIcons.bell, size: 18, color: colors.textMuted),
+                if (naoLidas > 0)
+                  Positioned(
+                    right: -3,
+                    top: -3,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(color: colors.error, shape: BoxShape.circle),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        child: Text(
+                          naoLidas > 9 ? '9+' : '$naoLidas',
+                          style: AppTypography.monoSmall.copyWith(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

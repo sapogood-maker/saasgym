@@ -5,8 +5,10 @@ import { TenantContextService } from '../context/tenant-context.service';
 /// academiaId. `Aluno`/`Professor` entraram no Sprint 3, `Plano` no
 /// Módulo 1, `Matricula` no Módulo 2, `Mensalidade`/`Lancamento` no
 /// Módulo 3, `Modalidade`/`Turma`/`Recorrencia`/`Aula`/`TurmaAluno`/
-/// `AulaAluno`/`Feriado` no Módulo 4 — exatamente a mudança prevista desde
-/// o Sprint 1 (adicionar um model à lista, sem tocar na lógica abaixo).
+/// `AulaAluno`/`Feriado` no Módulo 4, `AvaliacaoFisica` no Módulo 5,
+/// `SolicitacaoReposicao`/`Notificacao` na Sprint 6 — exatamente a
+/// mudança prevista desde o Sprint 1 (adicionar um model à lista, sem
+/// tocar na lógica abaixo).
 const TENANT_SCOPED_MODELS = new Set([
   'User',
   'Aluno',
@@ -22,6 +24,9 @@ const TENANT_SCOPED_MODELS = new Set([
   'TurmaAluno',
   'AulaAluno',
   'Feriado',
+  'AvaliacaoFisica',
+  'SolicitacaoReposicao',
+  'Notificacao',
 ]);
 
 const WHERE_OPERATIONS = new Set([
