@@ -49,5 +49,9 @@ import { NotificationsModule } from '../../notifications/notifications.module';
     AulaAlunosService,
     SolicitacoesReposicaoService,
   ],
+  // Exportado pro Dashboard geral da academia (docs/22) compor "Agenda da
+  // semana" reaproveitando listCalendario — primeira vez que este módulo
+  // exporta algo.
+  exports: [AulasService],
 })
 export class AgendaModule {}

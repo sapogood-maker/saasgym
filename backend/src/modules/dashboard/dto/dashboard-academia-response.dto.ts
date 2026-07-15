@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AulaResponseDto } from '../../agenda/aulas/dto/aula-response.dto';
+import { MensalidadeAlertaResponseDto } from '../../financeiro/mensalidades/dto/mensalidade-alerta-response.dto';
 
 class AniversarianteDto {
   @ApiProperty()
@@ -22,9 +24,35 @@ class AlunoRecenteDto {
   createdAt!: Date;
 }
 
-/// Dashboard da própria academia — distinto do dashboard do SYSTEM_ADMIN
-/// (Sprint 2, /admin/dashboard, visão cross-tenant da plataforma). Ainda
-/// sem Agenda/Financeiro (chegam em sprints futuros).
+class DashboardFinanceiroResumoDto {
+  @ApiProperty({ description: 'Soma de Matricula.valor das ATIVA cuja vigência cobre o mês corrente' })
+  receitaPrevista!: number;
+
+  @ApiProperty({ description: 'Soma de Lancamento tipo RECEITA do mês corrente' })
+  receitaRecebida!: number;
+
+  @ApiProperty()
+  despesas!: number;
+
+  @ApiProperty({ description: 'receitaRecebida - despesas' })
+  saldo!: number;
+
+  @ApiProperty({ description: 'Sempre tempo real — todas as Mensalidade PENDENTE vencidas até hoje' })
+  inadimplenciaValor!: number;
+
+  @ApiProperty()
+  inadimplenciaQuantidade!: number;
+
+  @ApiProperty({
+    type: [MensalidadeAlertaResponseDto],
+    description: 'Vencidas + a vencer nos próximos 7 dias, combinadas e capadas em 10 (docs/22)',
+  })
+  mensalidadesAlerta!: MensalidadeAlertaResponseDto[];
+}
+
+/// Dashboard da própria academia — Centro de Operações (docs/22) —
+/// distinto do dashboard do SYSTEM_ADMIN (Sprint 2, /admin/dashboard,
+/// visão cross-tenant da plataforma).
 export class DashboardAcademiaResponseDto {
   @ApiProperty()
   totalAlunos!: number;
@@ -49,4 +77,13 @@ export class DashboardAcademiaResponseDto {
   /// em vez de só uma contagem.
   @ApiProperty({ type: [AlunoRecenteDto] })
   alunosNovos!: AlunoRecenteDto[];
+
+  /// Aulas dos próximos 7 dias (hoje incluso), reaproveitando o mesmo
+  /// shape de `AulaResponseDto` do Calendário — agrupamento por dia é
+  /// responsabilidade do frontend (docs/22, decisão 5).
+  @ApiProperty({ type: [AulaResponseDto] })
+  aulasSemana!: AulaResponseDto[];
+
+  @ApiProperty({ type: DashboardFinanceiroResumoDto })
+  financeiro!: DashboardFinanceiroResumoDto;
 }

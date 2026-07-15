@@ -9,15 +9,17 @@ final _dashboardProvider = FutureProvider.autoDispose<DashboardAcademia>((ref) {
   return ref.watch(dashboardApiProvider).get();
 });
 
-/// Dashboard operacional — a pergunta que a tela responde é "o que eu
-/// preciso fazer hoje?", não "aqui estão meus indicadores". Por isso os
-/// indicadores (seção "Indicadores") vêm por último, depois de alertas,
-/// ações pendentes, agenda e listas acionáveis — ordem que reflete
-/// prioridade operacional, não importância técnica dos dados.
+final _formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+/// Centro de Operações da academia (docs/22) — a pergunta que a tela
+/// responde é "o que eu preciso fazer agora?", não "aqui estão meus
+/// indicadores". Por isso a ordem de prioridade é Alertas financeiros →
+/// Agenda da semana → Navegação rápida → listas complementares →
+/// Indicadores (por último) — e nenhuma seção usa gráfico.
 ///
 /// Construída inteiramente com o Design System (`AppCard`, `MetricCard`,
-/// `AppListTile`, `EmptyState`, `LoadingSkeleton`) — nenhum widget
-/// específico desta tela.
+/// `AppListTile`, `AppBadge`, `EmptyState`, `LoadingSkeleton`) — nenhum
+/// widget específico desta tela.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -35,42 +37,6 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             _Header(nome: usuario?.nome),
             const SizedBox(height: AppSpacing.xxl),
-
-            // Prioridades 1-3: não dependem do fetch do dashboard (são
-            // placeholders estáticos) — aparecem imediatamente, sem
-            // esperar a rede.
-            _PrioritySection(
-              title: 'Alertas importantes',
-              child: EmptyState.comingSoon(
-                icon: AppIcons.alert,
-                title: 'Alunos inadimplentes e mensalidades vencendo',
-                description: 'Vai aparecer aqui assim que o módulo financeiro existir.',
-                sprintTag: 'MÓDULO 3 · FINANCEIRO',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _PrioritySection(
-              title: 'Ações pendentes',
-              child: EmptyState.comingSoon(
-                icon: AppIcons.pendingActions,
-                title: 'Matrículas pendentes de confirmação',
-                description: 'Vai aparecer aqui assim que o fluxo de matrículas existir.',
-                sprintTag: 'MÓDULO 2 · MATRÍCULAS',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _PrioritySection(
-              title: 'Agenda do dia',
-              child: EmptyState.comingSoon(
-                icon: AppIcons.calendar,
-                title: 'Aulas e horários de personal de hoje',
-                description: 'Vai aparecer aqui assim que a agenda existir.',
-                sprintTag: 'MÓDULO 4 · MS7',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-
-            // Prioridades 4-7: dependem do fetch do dashboard.
             dashboardAsync.when(
               loading: () => const _DadosSkeleton(),
               error: (erro, _) => _DadosErro(
@@ -91,6 +57,14 @@ String _mensagemErro(Object erro) {
     return 'Seu perfil não tem acesso ao dashboard da academia.';
   }
   return 'Não foi possível carregar o dashboard.';
+}
+
+String _iniciais(String texto) {
+  final partes = texto.trim().split(RegExp(r'\s+'));
+  if (partes.isEmpty || partes.first.isEmpty) return '?';
+  final primeira = partes.first[0];
+  final ultima = partes.length > 1 ? partes.last[0] : '';
+  return (primeira + ultima).toUpperCase();
 }
 
 class _Header extends StatelessWidget {
@@ -125,7 +99,7 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Aqui está o que precisa da sua atenção hoje.',
+                'Aqui está o que precisa da sua atenção agora.',
                 style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
               ),
             ],
@@ -149,26 +123,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _PrioritySection extends StatelessWidget {
-  final String title;
-  final Widget child;
-
-  const _PrioritySection({required this.title, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: AppTypography.titleMedium.copyWith(color: colors.textMuted)),
-        const SizedBox(height: AppSpacing.sm),
-        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: child),
-      ],
-    );
-  }
-}
-
 class _DadosSkeleton extends StatelessWidget {
   const _DadosSkeleton();
 
@@ -177,9 +131,11 @@ class _DadosSkeleton extends StatelessWidget {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppCard(title: 'Alunos novos', loading: true),
+        AppCard(title: 'Alertas financeiros', loading: true),
         SizedBox(height: AppSpacing.xl),
-        AppCard(title: 'Aniversariantes', loading: true),
+        AppCard(title: 'Agenda da semana', loading: true),
+        SizedBox(height: AppSpacing.xl),
+        AppCard(title: 'Alunos novos', loading: true),
       ],
     );
   }
@@ -215,6 +171,12 @@ class _DadosConteudo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _AlertasFinanceirosSection(financeiro: dashboard.financeiro),
+        const SizedBox(height: AppSpacing.xl),
+        _AgendaSemanaSection(aulas: dashboard.aulasSemana),
+        const SizedBox(height: AppSpacing.xl),
+        const _NavegacaoRapidaSection(),
+        const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Alunos novos',
           subtitle: 'Cadastrados este mês',
@@ -260,16 +222,6 @@ class _DadosConteudo extends StatelessWidget {
                   ],
                 ),
         ),
-        const SizedBox(height: AppSpacing.xl),
-        _PrioritySection(
-          title: 'Últimas atividades',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.history,
-            title: 'Histórico de ações da equipe',
-            description: 'Login, cadastros e edições recentes vão aparecer aqui.',
-            sprintTag: 'EM DESENVOLVIMENTO',
-          ),
-        ),
         const SizedBox(height: AppSpacing.xxl),
         Text('Indicadores', style: AppTypography.titleMedium.copyWith(color: context.colors.textMuted)),
         const SizedBox(height: AppSpacing.sm),
@@ -286,12 +238,232 @@ class _DadosConteudo extends StatelessWidget {
       ],
     );
   }
+}
 
-  String _iniciais(String nome) {
-    final partes = nome.trim().split(RegExp(r'\s+'));
-    if (partes.isEmpty || partes.first.isEmpty) return '?';
-    final primeira = partes.first[0];
-    final ultima = partes.length > 1 ? partes.last[0] : '';
-    return (primeira + ultima).toUpperCase();
+/// Prioridade 1 — a única com valor em R$ e ação imediata (ligar pro
+/// aluno). `inadimplenciaValor`/`inadimplenciaQuantidade` (sempre tempo
+/// real) aparecem em destaque; a lista combina vencidas + a vencer nos
+/// próximos dias, vencidas primeiro (docs/22, decisões 3/4).
+class _AlertasFinanceirosSection extends StatelessWidget {
+  final DashboardFinanceiroResumo financeiro;
+
+  const _AlertasFinanceirosSection({required this.financeiro});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final temInadimplencia = financeiro.inadimplenciaQuantidade > 0;
+
+    return AppCard(
+      title: 'Alertas financeiros',
+      subtitle: 'Mensalidades vencidas e a vencer nos próximos dias',
+      actions: [
+        AppBadge(
+          temInadimplencia ? '${financeiro.inadimplenciaQuantidade} em atraso' : 'Em dia',
+          tone: temInadimplencia ? AppBadgeTone.error : AppBadgeTone.success,
+        ),
+      ],
+      child: financeiro.mensalidadesAlerta.isEmpty
+          ? EmptyState(
+              icon: AppIcons.finance,
+              title: 'Nenhuma mensalidade vencida ou a vencer',
+              actionLabel: 'Ver mensalidades',
+              onAction: () => context.push('/financeiro/mensalidades'),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (temInadimplencia) ...[
+                  Text(
+                    '${_formatoMoeda.format(financeiro.inadimplenciaValor)} em atraso no total',
+                    style: AppTypography.bodySmall.copyWith(color: colors.error, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                for (final alerta in financeiro.mensalidadesAlerta)
+                  AppListTile(
+                    title: alerta.alunoNome,
+                    subtitle: alerta.vencida
+                        ? 'Venceu em ${DateFormat('dd/MM').format(alerta.dataVencimento)}'
+                        : 'Vence em ${DateFormat('dd/MM').format(alerta.dataVencimento)}',
+                    leadingText: _iniciais(alerta.alunoNome),
+                    trailing: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_formatoMoeda.format(alerta.valor), style: AppTypography.bodySmall.copyWith(color: colors.text)),
+                        const SizedBox(height: AppSpacing.xs),
+                        AppBadge(
+                          alerta.vencida ? 'Vencida' : 'A vencer',
+                          tone: alerta.vencida ? AppBadgeTone.error : AppBadgeTone.warning,
+                        ),
+                      ],
+                    ),
+                    onTap: () => context.push('/alunos/${alerta.alunoId}'),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Prioridade 2 — aulas dos próximos dias agrupadas por dia, sem
+/// paginação nem contador redundante (o tamanho da própria lista já
+/// comunica quantas aulas há) — docs/22, decisão 5.
+class _AgendaSemanaSection extends StatelessWidget {
+  final List<Aula> aulas;
+
+  const _AgendaSemanaSection({required this.aulas});
+
+  @override
+  Widget build(BuildContext context) {
+    final grupos = _agruparPorDia(aulas);
+
+    return AppCard(
+      title: 'Agenda da semana',
+      subtitle: 'Aulas dos próximos dias',
+      child: grupos.isEmpty
+          ? EmptyState(
+              icon: AppIcons.calendar,
+              title: 'Nenhuma aula agendada essa semana',
+              actionLabel: 'Ver calendário',
+              onAction: () => context.push('/agenda/calendario'),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final grupo in grupos) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
+                    child: Text(
+                      _rotuloDia(grupo.key),
+                      style: AppTypography.labelSmall.copyWith(color: context.colors.textFaint),
+                    ),
+                  ),
+                  for (final aula in grupo.value)
+                    AppListTile(
+                      title: '${aula.horaInicio} · ${aula.turmaNome}',
+                      subtitle: '${aula.modalidadeNome} · ${aula.professorNome}',
+                      leadingText: _iniciais(aula.turmaNome),
+                      trailing: AppBadge(
+                        aula.status == AulaStatus.cancelada ? 'Cancelada' : 'Agendada',
+                        tone: aula.status == AulaStatus.cancelada ? AppBadgeTone.neutral : AppBadgeTone.info,
+                      ),
+                      onTap: () => context.push('/agenda/calendario'),
+                    ),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+/// Agrupa por `Aula.data` (sempre meia-noite UTC do dia — mesmo valor pra
+/// toda aula do mesmo dia) e ordena cada grupo por `horaInicio`.
+List<MapEntry<DateTime, List<Aula>>> _agruparPorDia(List<Aula> aulas) {
+  final grupos = <DateTime, List<Aula>>{};
+  for (final aula in aulas) {
+    grupos.putIfAbsent(aula.data, () => []).add(aula);
+  }
+  final entradas = grupos.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  for (final entrada in entradas) {
+    entrada.value.sort((a, b) => a.horaInicio.compareTo(b.horaInicio));
+  }
+  return entradas;
+}
+
+const _diasSemana = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
+
+String _rotuloDia(DateTime dia) {
+  final agora = DateTime.now().toUtc();
+  final hoje = DateTime.utc(agora.year, agora.month, agora.day);
+  final diferenca = dia.difference(hoje).inDays;
+  if (diferenca == 0) return 'Hoje';
+  if (diferenca == 1) return 'Amanhã';
+  final nomeDia = _diasSemana[dia.weekday - 1];
+  final capitalizado = '${nomeDia[0].toUpperCase()}${nomeDia.substring(1)}';
+  return '$capitalizado, ${DateFormat('dd/MM').format(dia)}';
+}
+
+/// Prioridade 3 — atalhos pras telas mais acessadas a partir do
+/// Dashboard, 100% frontend (rotas já existentes) — cobre o mesmo
+/// propósito que os antigos placeholders "Ações pendentes"/"Últimas
+/// atividades" cobriam, sem prometer conteúdo que não existe (docs/22,
+/// decisões 1/7).
+class _NavegacaoRapidaSection extends StatelessWidget {
+  const _NavegacaoRapidaSection();
+
+  static const _atalhos = [
+    (label: 'Alunos', icon: AppIcons.students, path: '/alunos'),
+    (label: 'Matrículas', icon: AppIcons.enrollment, path: '/matriculas'),
+    (label: 'Mensalidades', icon: AppIcons.pendingActions, path: '/financeiro/mensalidades'),
+    (label: 'Calendário', icon: AppIcons.calendar, path: '/agenda/calendario'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Navegação rápida', style: AppTypography.titleMedium.copyWith(color: context.colors.textMuted)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: [
+            for (final atalho in _atalhos)
+              _QuickActionTile(
+                label: atalho.label,
+                icon: atalho.icon,
+                onTap: () => context.push(atalho.path),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _QuickActionTile({required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return SizedBox(
+      width: 220,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.cardRaised,
+                border: Border.all(color: colors.border),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Icon(icon, size: 16, color: colors.textMuted),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                label,
+                style: AppTypography.titleMedium.copyWith(color: colors.text),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(AppIcons.chevronRight, size: 16, color: colors.textFaint),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -3,8 +3,23 @@ import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { createTestApp } from './utils/create-test-app';
-import { createAcademiaFixture } from './utils/fixtures';
+import {
+  createAcademiaFixture,
+  createAlunoFixture,
+  createMatriculaFixture,
+  createModalidadeFixture,
+  createPlanoFixture,
+  createProfessorFixture,
+} from './utils/fixtures';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+/// Meia-noite UTC do dia — mesma construção de `Aula.data`/`Mensalidade.dataVencimento`
+/// em produção (`dataVencimentoNoMes`), não um timestamp com hora corrente.
+function diasAPartirDeHoje(dias: number): Date {
+  const agora = new Date();
+  const hoje = Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate());
+  return new Date(hoje + dias * 24 * 60 * 60 * 1000);
+}
 
 const SENHA = 'SenhaForte123';
 
@@ -164,5 +179,107 @@ describe('Dashboard da academia (e2e)', () => {
     expect(res.body.aniversariantes).toHaveLength(1);
     expect(res.body.aniversariantes[0].id).toBe(aniversariante.body.id);
     expect(res.body.aniversariantes[0].nome).toBe('Aniversariante Do Mês');
+  });
+
+  describe('aulasSemana (docs/22, Centro de Operações)', () => {
+    it('traz só aulas dentro da janela hoje..hoje+7 (inclusive), fora da janela fica de fora', async () => {
+      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Agenda Semana E2E' });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+      const modalidade = await createModalidadeFixture(prisma, academia.id);
+      const professor = await createProfessorFixture(prisma, academia.id);
+      const usuario = await prisma.user.findFirstOrThrow({ where: { academiaId: academia.id } });
+
+      const turma = await request(app.getHttpServer())
+        .post('/api/agenda/turmas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Turma Dashboard Semana', modalidadeId: modalidade.id, professorId: professor.id })
+        .expect(201);
+
+      const criarAula = (data: Date) =>
+        prisma.aula.create({
+          data: {
+            academiaId: academia.id,
+            turmaId: turma.body.id,
+            recorrenciaId: null,
+            data,
+            horaInicio: '07:00',
+            duracaoMinutos: 60,
+            professorId: professor.id,
+            status: 'AGENDADA',
+            createdByUserId: usuario.id,
+          },
+        });
+
+      const dentroDaJanelaHoje = await criarAula(diasAPartirDeHoje(0));
+      const dentroDaJanelaFuturo = await criarAula(diasAPartirDeHoje(3));
+      const dentroDaJanelaLimite = await criarAula(diasAPartirDeHoje(7)); // limite inclusive
+      await criarAula(diasAPartirDeHoje(-1)); // ontem — fora da janela
+      await criarAula(diasAPartirDeHoje(8)); // um dia além do limite — fora da janela
+
+      const res = await request(app.getHttpServer())
+        .get('/api/dashboard')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const idsRetornados = res.body.aulasSemana.map((a: { id: string }) => a.id);
+      expect(idsRetornados).toEqual(
+        expect.arrayContaining([dentroDaJanelaHoje.id, dentroDaJanelaFuturo.id, dentroDaJanelaLimite.id]),
+      );
+      expect(res.body.aulasSemana).toHaveLength(3);
+    });
+  });
+
+  describe('financeiro (docs/22, Centro de Operações)', () => {
+    it('resumo do mês corrente + mensalidadesAlerta combina vencidas e a vencer em 7 dias, ordenadas, capadas em 10', async () => {
+      const academia = await createAcademiaFixture(prisma, { nome: 'Academia Financeiro Dashboard E2E' });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+      const usuario = await prisma.user.findFirstOrThrow({ where: { academiaId: academia.id } });
+      const aluno = await createAlunoFixture(prisma, academia.id);
+      const plano = await createPlanoFixture(prisma, academia.id, { valor: 100 });
+      const agora = new Date();
+      const matricula = await createMatriculaFixture(prisma, academia.id, aluno.id, plano.id, usuario.id, {
+        valor: 100,
+        dataInicio: new Date(Date.UTC(agora.getUTCFullYear(), 0, 1)),
+        dataFimPrevista: new Date(Date.UTC(agora.getUTCFullYear() + 1, 0, 1)),
+        dataFim: new Date(Date.UTC(agora.getUTCFullYear() + 1, 0, 1)),
+      });
+
+      const criarMensalidade = (dataVencimento: Date, status: 'PENDENTE' | 'PAGA' = 'PENDENTE') =>
+        prisma.mensalidade.create({
+          data: {
+            academiaId: academia.id,
+            matriculaId: matricula.id,
+            alunoId: aluno.id,
+            valor: 100,
+            dataVencimento,
+            status,
+            createdByUserId: usuario.id,
+          },
+        });
+
+      const vencidaAntiga = await criarMensalidade(new Date('2020-01-10'));
+      const aVencerEm3Dias = await criarMensalidade(diasAPartirDeHoje(3));
+      await criarMensalidade(diasAPartirDeHoje(8)); // fora da janela (limite é hoje+7 inclusive)
+      await criarMensalidade(new Date('2019-01-10'), 'PAGA'); // paga não entra no alerta
+
+      const res = await request(app.getHttpServer())
+        .get('/api/dashboard')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.financeiro.receitaPrevista).toBe(100);
+      expect(res.body.financeiro.inadimplenciaValor).toBe(100);
+      expect(res.body.financeiro.inadimplenciaQuantidade).toBe(1);
+
+      expect(res.body.financeiro.mensalidadesAlerta).toHaveLength(2);
+      expect(res.body.financeiro.mensalidadesAlerta[0]).toMatchObject({
+        id: vencidaAntiga.id,
+        vencida: true,
+      });
+      expect(res.body.financeiro.mensalidadesAlerta[1]).toMatchObject({
+        id: aVencerEm3Dias.id,
+        vencida: false,
+      });
+    });
   });
 });

@@ -10,6 +10,7 @@ import {
   MensalidadeResponseDto,
   PaginatedMensalidadesResponseDto,
 } from './dto/mensalidade-response.dto';
+import { MensalidadeAlertaResponseDto } from './dto/mensalidade-alerta-response.dto';
 import { dataVencimentoNoMes, valorFinal } from './mensalidades.util';
 import { intervaloDoMes } from '../financeiro.util';
 import { TenantContextService } from '../../../common/context/tenant-context.service';
@@ -26,6 +27,11 @@ const mensalidadeInclude = {
 } satisfies Prisma.MensalidadeInclude;
 
 type MensalidadeComRelacoes = Prisma.MensalidadeGetPayload<{ include: typeof mensalidadeInclude }>;
+
+/// Cap da lista de alertas do Dashboard (docs/22, decisão 4) — lista curta
+/// e acionável, não uma paginação completa (essa já existe na tela de
+/// Mensalidades).
+const MENSALIDADES_ALERTA_LIMITE = 10;
 
 /// Cobrança mensal derivada de Matricula. Gerada sob demanda (`gerar`, sem
 /// scheduler — docs/17-modulo-3-financeiro-analise.md, item 2), nunca
@@ -344,6 +350,38 @@ export class MensalidadesService {
       0,
     );
     return { valor: Math.round(valor * 100) / 100, quantidade: mensalidades.length };
+  }
+
+  /// Alertas do Dashboard (docs/22, decisões 3/4/6) — mensalidades
+  /// PENDENTE já vencidas ou que vencem dentro de `dias` a partir de hoje,
+  /// numa única lista ordenada por `dataVencimento` ascendente: como
+  /// vencidas têm data no passado e "a vencer" no futuro, essa ordenação
+  /// já produz "vencidas primeiro, depois a vencer" sem precisar de dois
+  /// grupos separados. Capada em `MENSALIDADES_ALERTA_LIMITE` — é um
+  /// alerta acionável, não uma listagem completa.
+  async proximosVencimentos(dias: number): Promise<MensalidadeAlertaResponseDto[]> {
+    // `dataVencimento` é sempre meia-noite UTC do dia (`dataVencimentoNoMes`)
+    // — truncar "hoje" pro dia em UTC, não a hora corrente, senão uma
+    // mensalidade vencendo hoje mais tarde no dia ficaria de fora do `lte`.
+    const agora = new Date();
+    const hoje = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()));
+    const limite = new Date(hoje.getTime() + dias * 24 * 60 * 60 * 1000);
+
+    const mensalidades = await this.prisma.forTenant().mensalidade.findMany({
+      where: { status: MensalidadeStatus.PENDENTE, dataVencimento: { lte: limite }, deletedAt: null },
+      include: mensalidadeInclude,
+      orderBy: { dataVencimento: 'asc' },
+      take: MENSALIDADES_ALERTA_LIMITE,
+    });
+
+    return mensalidades.map((m) => ({
+      id: m.id,
+      alunoId: m.alunoId,
+      alunoNome: m.aluno.nome,
+      valor: valorFinal(Number(m.valor), Number(m.desconto), Number(m.multa)),
+      dataVencimento: m.dataVencimento,
+      vencida: m.dataVencimento < hoje,
+    }));
   }
 
   private async findOrThrow(id: string): Promise<MensalidadeComRelacoes> {

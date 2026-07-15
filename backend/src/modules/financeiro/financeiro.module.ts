@@ -17,5 +17,9 @@ import { AuditModule } from '../audit/audit.module';
   imports: [AuditModule],
   controllers: [MensalidadesController, LancamentosController, DashboardFinanceiroController],
   providers: [MensalidadesService, LancamentosService, DashboardFinanceiroService],
+  // Exportados pro Dashboard geral da academia (docs/22) compor
+  // "Alertas importantes" sem repetir regra de negócio — primeira vez que
+  // este módulo exporta algo.
+  exports: [MensalidadesService, DashboardFinanceiroService],
 })
 export class FinanceiroModule {}

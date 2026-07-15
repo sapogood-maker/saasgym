@@ -1,3 +1,6 @@
+import '../agenda/aula.dart';
+import 'dashboard_financeiro_resumo.dart';
+
 /// Aniversariante do mês corrente — parte do dashboard da academia.
 class Aniversariante {
   const Aniversariante({
@@ -37,8 +40,8 @@ class AlunoRecente {
   final DateTime createdAt;
 }
 
-/// Visão geral da própria academia — `GET /dashboard`. Ainda sem
-/// Agenda/Financeiro (chegam em sprints futuros).
+/// Visão geral da própria academia — `GET /dashboard` — Centro de
+/// Operações (docs/22).
 class DashboardAcademia {
   const DashboardAcademia({
     required this.totalAlunos,
@@ -48,6 +51,8 @@ class DashboardAcademia {
     required this.aniversariantes,
     required this.usuariosDoSistema,
     required this.alunosNovos,
+    required this.aulasSemana,
+    required this.financeiro,
   });
 
   factory DashboardAcademia.fromJson(Map<String, dynamic> json) {
@@ -65,6 +70,13 @@ class DashboardAcademia {
           .cast<Map<String, dynamic>>()
           .map(AlunoRecente.fromJson)
           .toList(),
+      aulasSemana: (json['aulasSemana'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(Aula.fromJson)
+          .toList(),
+      financeiro: DashboardFinanceiroResumo.fromJson(
+        json['financeiro'] as Map<String, dynamic>,
+      ),
     );
   }
 
@@ -75,4 +87,10 @@ class DashboardAcademia {
   final List<Aniversariante> aniversariantes;
   final int usuariosDoSistema;
   final List<AlunoRecente> alunosNovos;
+
+  /// Aulas dos próximos 7 dias (hoje incluso) — agrupamento por dia é
+  /// responsabilidade de quem exibe (docs/22, decisão 5).
+  final List<Aula> aulasSemana;
+
+  final DashboardFinanceiroResumo financeiro;
 }
