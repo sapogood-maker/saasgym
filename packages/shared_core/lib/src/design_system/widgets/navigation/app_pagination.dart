@@ -91,6 +91,9 @@ class _StepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // Docs/27: 40×40 em telas de toque (era 30×30 fixo); desktop mantém
+    // 30×30, sem nenhuma mudança visual.
+    final size = context.isTouch ? 40.0 : 30.0;
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -101,8 +104,8 @@ class _StepButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.sm),
           hoverColor: colors.cardRaised,
           child: Container(
-            width: 30,
-            height: 30,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               border: Border.all(color: colors.border),
               borderRadius: BorderRadius.circular(AppRadius.sm),

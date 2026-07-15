@@ -72,14 +72,10 @@ class AppShell extends ConsumerWidget {
   }
 
   void _abrirNotificacoes(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.4),
-      builder: (context) => const Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: SizedBox(width: 380, child: _NotificacoesPopover()),
-      ),
+    showAppDialog<void>(
+      context,
+      maxWidth: 380,
+      builder: (_) => const _NotificacoesPopover(),
     );
   }
 
@@ -167,47 +163,52 @@ class _NotificacoesPopover extends ConsumerWidget {
     final colors = context.colors;
     final async = ref.watch(_notificacoesProvider);
 
-    return AppCard(
-      title: 'Notificações',
-      child: async.when(
-        loading: () => const Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LoadingSkeleton(width: double.infinity, height: 16),
-            SizedBox(height: AppSpacing.sm),
-            LoadingSkeleton(width: double.infinity, height: 16),
-          ],
-        ),
-        error: (erro, _) => EmptyState(
-          icon: AppIcons.alert,
-          title: 'Não foi possível carregar as notificações.',
-          actionLabel: 'Tentar novamente',
-          onAction: () => ref.invalidate(_notificacoesProvider),
-        ),
-        data: (paginado) {
-          if (paginado.items.isEmpty) {
-            return const EmptyState(icon: AppIcons.bell, title: 'Nenhuma notificação');
-          }
-          return ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 360),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  for (var i = 0; i < paginado.items.length; i++) ...[
-                    if (i > 0) Divider(color: colors.borderSoft, height: 1),
-                    _NotificacaoRow(
-                      notificacao: paginado.items[i],
-                      onTap: paginado.items[i].lida
-                          ? null
-                          : () => _marcarComoLida(ref, paginado.items[i].id),
-                    ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Notificações', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.md),
+        async.when(
+          loading: () => const Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              LoadingSkeleton(width: double.infinity, height: 16),
+              SizedBox(height: AppSpacing.sm),
+              LoadingSkeleton(width: double.infinity, height: 16),
+            ],
+          ),
+          error: (erro, _) => EmptyState(
+            icon: AppIcons.alert,
+            title: 'Não foi possível carregar as notificações.',
+            actionLabel: 'Tentar novamente',
+            onAction: () => ref.invalidate(_notificacoesProvider),
+          ),
+          data: (paginado) {
+            if (paginado.items.isEmpty) {
+              return const EmptyState(icon: AppIcons.bell, title: 'Nenhuma notificação');
+            }
+            return ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 360),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (var i = 0; i < paginado.items.length; i++) ...[
+                      if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                      _NotificacaoRow(
+                        notificacao: paginado.items[i],
+                        onTap: paginado.items[i].lida
+                            ? null
+                            : () => _marcarComoLida(ref, paginado.items[i].id),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

@@ -20,8 +20,46 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
 
+  <!--
+    Sem maximum-scale/user-scalable=no de propósito (docs/27, decisão 5):
+    zoom manual do usuário continua acessível. O auto-zoom incômodo do
+    Safari/WebView ao focar um campo já é resolvido pela causa raiz (fonte
+    ≥16px em telas de toque, docs/27 MS1), não bloqueando o gesto do
+    usuário — travar zoom prejudica acessibilidade sem necessidade.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B0B0B">
+
+  <!--
+    O engine do Flutter web remove esta tag sozinho e recria a dele
+    (`content="...maximum-scale=1.0, user-scalable=no"`, travando o zoom)
+    — comportamento interno do engine, não uma configuração do projeto,
+    confirmado inspecionando `main.dart.js` compilado. O MutationObserver
+    abaixo corrige de volta pro valor permissivo sempre que o engine
+    reescrever a tag, sem depender de quando isso acontece (pode ser mais
+    de uma vez, ex. a cada foco de campo de texto).
+  -->
+  <script>
+    (function () {
+      var desired = 'width=device-width, initial-scale=1';
+      function enforce() {
+        document.head.querySelectorAll('meta[name="viewport"]').forEach(function (tag) {
+          if (tag.getAttribute('content') !== desired) tag.setAttribute('content', desired);
+        });
+      }
+      new MutationObserver(enforce).observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content'],
+      });
+      enforce();
+    })();
+  </script>
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="SaaSGym Admin">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">

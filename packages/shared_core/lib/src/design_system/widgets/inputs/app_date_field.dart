@@ -40,6 +40,9 @@ class AppDateField extends FormField<DateTime> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
+               // Docs/27: mesmo critério de AppTextField/AppSelect —
+               // `inputText` (16px) só em telas de toque.
+               final textStyle = context.isTouch ? AppTypography.inputText : AppTypography.bodyMedium;
                return AppFieldFocusTracker(
                  builder: (isFocused) => AppFieldChrome(
                    label: label,
@@ -66,7 +69,7 @@ class AppDateField extends FormField<DateTime> {
                        field.value != null
                            ? _formatar(field.value!, dateFormatPattern)
                            : placeholder,
-                       style: AppTypography.bodyMedium.copyWith(
+                       style: textStyle.copyWith(
                          color: field.value != null ? colors.text : colors.textFaint,
                        ),
                      ),

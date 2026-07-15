@@ -105,8 +105,10 @@ class AppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = _paletteFor(context.colors);
 
+    // Docs/27: altura de toque ≥44px em telas de toque (era 40px fixo em
+    // qualquer tela); desktop mantém 40px, sem nenhuma mudança visual.
     return SizedBox(
-      height: 40,
+      height: context.isTouch ? 44 : 40,
       child: TextButton(
         onPressed: _isDisabled ? null : onPressed,
         style: ButtonStyle(

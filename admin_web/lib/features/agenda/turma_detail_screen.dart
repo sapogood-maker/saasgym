@@ -298,16 +298,18 @@ class _RecorrenciasSectionState extends ConsumerState<_RecorrenciasSection> {
   }
 
   Future<void> _nova() async {
-    final criada = await showDialog<bool>(
-      context: context,
+    final criada = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _RecorrenciaFormDialog(turmaId: widget.turmaId),
     );
     if (criada == true) _carregar();
   }
 
   Future<void> _abrirAcoes(Recorrencia recorrencia) async {
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _AcoesRecorrenciaDialog(turmaId: widget.turmaId, recorrencia: recorrencia),
     );
     if (alterou == true) _carregar();
@@ -513,154 +515,138 @@ class _RecorrenciaFormDialogState extends ConsumerState<_RecorrenciaFormDialog> 
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: _carregandoOpcoes
-              ? const SizedBox(
-                  height: 120,
-                  child: Center(child: LoadingSkeleton(width: 200, height: 16)),
-                )
-              : Form(
-                  key: _formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Nova recorrência', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                        const SizedBox(height: AppSpacing.lg),
-                        AppSelect<RecorrenciaTipo?>(
-                          label: 'Tipo',
-                          value: _tipo,
-                          options: const [
-                            AppSelectOption(value: RecorrenciaTipo.semanal, label: 'Semanal'),
-                            AppSelectOption(value: RecorrenciaTipo.mensal, label: 'Mensal'),
-                            AppSelectOption(value: RecorrenciaTipo.intervalada, label: 'Intervalada'),
-                          ],
-                          onChanged: (v) => setState(() => _tipo = v),
-                          validator: (v) => v == null ? 'Selecione o tipo' : null,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        if (_tipo == RecorrenciaTipo.semanal)
-                          AppSelect<int?>(
-                            label: 'Dia da semana',
-                            value: _diaSemana,
-                            options: [
-                              for (var i = 0; i < _nomesDiaSemana.length; i++)
-                                AppSelectOption(value: i, label: _nomesDiaSemana[i]),
-                            ],
-                            onChanged: (v) => setState(() => _diaSemana = v),
-                            validator: (v) => v == null ? 'Selecione o dia da semana' : null,
-                          ),
-                        if (_tipo == RecorrenciaTipo.mensal)
-                          AppTextField(
-                            label: 'Dia do mês (1-31)',
-                            controller: _diaDoMesController,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              final numero = int.tryParse((v ?? '').trim());
-                              if (numero == null || numero < 1 || numero > 31) {
-                                return 'Informe um dia entre 1 e 31';
-                              }
-                              return null;
-                            },
-                          ),
-                        if (_tipo == RecorrenciaTipo.intervalada)
-                          AppTextField(
-                            label: 'Intervalo em dias',
-                            hintText: '14',
-                            controller: _intervaloDiasController,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              final numero = int.tryParse((v ?? '').trim());
-                              if (numero == null || numero < 1) return 'Informe um número válido';
-                              return null;
-                            },
-                          ),
-                        if (_tipo != null) const SizedBox(height: AppSpacing.md),
-                        AppFormRow(children: [
-                          AppTextField(
-                            label: 'Hora de início',
-                            hintText: '07:00',
-                            controller: _horaInicioController,
-                            validator: (v) {
-                              final valido = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch((v ?? '').trim());
-                              return valido ? null : 'Use o formato HH:mm';
-                            },
-                          ),
-                          AppTextField(
-                            label: 'Duração (min)',
-                            controller: _duracaoMinutosController,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              final numero = int.tryParse((v ?? '').trim());
-                              if (numero == null || numero < 1) return 'Informe um número válido';
-                              return null;
-                            },
-                          ),
-                        ]),
-                        const SizedBox(height: AppSpacing.md),
-                        AppSelect<String?>(
-                          label: 'Professor (opcional — substitui o titular só nesta recorrência)',
-                          value: _professorId,
-                          options: [
-                            const AppSelectOption(value: null, label: 'Usar professor titular da turma'),
-                            for (final professor in _professores)
-                              AppSelectOption(value: professor.id, label: professor.nome),
-                          ],
-                          onChanged: (v) => setState(() => _professorId = v),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        AppFormRow(children: [
-                          AppDateField(
-                            label: 'Início da vigência',
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 730)),
-                            value: _dataInicioVigencia,
-                            onChanged: (v) => setState(() => _dataInicioVigencia = v),
-                            validator: (v) => v == null ? 'Informe o início da vigência' : null,
-                          ),
-                          AppDateField(
-                            label: 'Fim da vigência (opcional)',
-                            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                            lastDate: DateTime.now().add(const Duration(days: 730)),
-                            value: _dataFimVigencia,
-                            onChanged: (v) => setState(() => _dataFimVigencia = v),
-                          ),
-                        ]),
-                        if (_erro != null) ...[
-                          const SizedBox(height: AppSpacing.md),
-                          AppFormErrorBanner(_erro!),
-                        ],
-                        const SizedBox(height: AppSpacing.xl),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            AppButton(
-                              label: 'Cancelar',
-                              variant: AppButtonVariant.secondary,
-                              onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+    return _carregandoOpcoes
+        ? const SizedBox(
+            height: 120,
+            child: Center(child: LoadingSkeleton(width: 200, height: 16)),
+          )
+        : Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nova recorrência', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+                const SizedBox(height: AppSpacing.lg),
+                AppSelect<RecorrenciaTipo?>(
+                  label: 'Tipo',
+                  value: _tipo,
+                  options: const [
+                    AppSelectOption(value: RecorrenciaTipo.semanal, label: 'Semanal'),
+                    AppSelectOption(value: RecorrenciaTipo.mensal, label: 'Mensal'),
+                    AppSelectOption(value: RecorrenciaTipo.intervalada, label: 'Intervalada'),
+                  ],
+                  onChanged: (v) => setState(() => _tipo = v),
+                  validator: (v) => v == null ? 'Selecione o tipo' : null,
                 ),
-        ),
-      ),
-    );
+                const SizedBox(height: AppSpacing.md),
+                if (_tipo == RecorrenciaTipo.semanal)
+                  AppSelect<int?>(
+                    label: 'Dia da semana',
+                    value: _diaSemana,
+                    options: [
+                      for (var i = 0; i < _nomesDiaSemana.length; i++)
+                        AppSelectOption(value: i, label: _nomesDiaSemana[i]),
+                    ],
+                    onChanged: (v) => setState(() => _diaSemana = v),
+                    validator: (v) => v == null ? 'Selecione o dia da semana' : null,
+                  ),
+                if (_tipo == RecorrenciaTipo.mensal)
+                  AppTextField(
+                    label: 'Dia do mês (1-31)',
+                    controller: _diaDoMesController,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      final numero = int.tryParse((v ?? '').trim());
+                      if (numero == null || numero < 1 || numero > 31) {
+                        return 'Informe um dia entre 1 e 31';
+                      }
+                      return null;
+                    },
+                  ),
+                if (_tipo == RecorrenciaTipo.intervalada)
+                  AppTextField(
+                    label: 'Intervalo em dias',
+                    hintText: '14',
+                    controller: _intervaloDiasController,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      final numero = int.tryParse((v ?? '').trim());
+                      if (numero == null || numero < 1) return 'Informe um número válido';
+                      return null;
+                    },
+                  ),
+                if (_tipo != null) const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppTextField(
+                    label: 'Hora de início',
+                    hintText: '07:00',
+                    controller: _horaInicioController,
+                    validator: (v) {
+                      final valido = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch((v ?? '').trim());
+                      return valido ? null : 'Use o formato HH:mm';
+                    },
+                  ),
+                  AppTextField(
+                    label: 'Duração (min)',
+                    controller: _duracaoMinutosController,
+                    keyboardType: TextInputType.number,
+                    validator: (v) {
+                      final numero = int.tryParse((v ?? '').trim());
+                      if (numero == null || numero < 1) return 'Informe um número válido';
+                      return null;
+                    },
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                AppSelect<String?>(
+                  label: 'Professor (opcional — substitui o titular só nesta recorrência)',
+                  value: _professorId,
+                  options: [
+                    const AppSelectOption(value: null, label: 'Usar professor titular da turma'),
+                    for (final professor in _professores)
+                      AppSelectOption(value: professor.id, label: professor.nome),
+                  ],
+                  onChanged: (v) => setState(() => _professorId = v),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                AppFormRow(children: [
+                  AppDateField(
+                    label: 'Início da vigência',
+                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    lastDate: DateTime.now().add(const Duration(days: 730)),
+                    value: _dataInicioVigencia,
+                    onChanged: (v) => setState(() => _dataInicioVigencia = v),
+                    validator: (v) => v == null ? 'Informe o início da vigência' : null,
+                  ),
+                  AppDateField(
+                    label: 'Fim da vigência (opcional)',
+                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                    lastDate: DateTime.now().add(const Duration(days: 730)),
+                    value: _dataFimVigencia,
+                    onChanged: (v) => setState(() => _dataFimVigencia = v),
+                  ),
+                ]),
+                if (_erro != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppFormErrorBanner(_erro!),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: 'Cancelar',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+                  ],
+                ),
+              ],
+            ),
+          );
   }
 }
 
@@ -797,31 +783,15 @@ class _AcoesRecorrenciaDialogState extends ConsumerState<_AcoesRecorrenciaDialog
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_descricaoRecorrencia(widget.recorrencia), style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.lg),
-                if (_view == _AcaoRecorrenciaView.menu) ..._menu(),
-                if (_view == _AcaoRecorrenciaView.editar) ..._formEditar(),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(_descricaoRecorrencia(widget.recorrencia), style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.lg),
+        if (_view == _AcaoRecorrenciaView.menu) ..._menu(),
+        if (_view == _AcaoRecorrenciaView.editar) ..._formEditar(),
+      ],
     );
   }
 
@@ -1030,16 +1000,18 @@ class _AlunosMatriculadosSectionState extends ConsumerState<_AlunosMatriculadosS
   }
 
   Future<void> _nova() async {
-    final inscrito = await showDialog<bool>(
-      context: context,
+    final inscrito = await showAppDialog<bool>(
+      context,
+      maxWidth: 420,
       builder: (_) => _NovaInscricaoDialog(turmaId: widget.turmaId),
     );
     if (inscrito == true) _carregar();
   }
 
   Future<void> _abrirAcoes(TurmaAluno turmaAluno) async {
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 420,
       builder: (_) => _AcoesTurmaAlunoDialog(turmaId: widget.turmaId, turmaAluno: turmaAluno),
     );
     if (alterou == true) _carregar();
@@ -1197,62 +1169,48 @@ class _NovaInscricaoDialogState extends ConsumerState<_NovaInscricaoDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: _carregandoOpcoes
-              ? const SizedBox(
-                  height: 100,
-                  child: Center(child: LoadingSkeleton(width: 200, height: 16)),
-                )
-              : Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Nova inscrição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                      const SizedBox(height: AppSpacing.lg),
-                      AppSelect<String?>(
-                        label: 'Aluno',
-                        value: _alunoId,
-                        options: [
-                          for (final aluno in _alunos) AppSelectOption(value: aluno.id, label: aluno.nome),
-                        ],
-                        onChanged: (v) => setState(() => _alunoId = v),
-                        validator: (v) => v == null ? 'Selecione o aluno' : null,
-                      ),
-                      if (_erro != null) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        AppFormErrorBanner(_erro!),
-                      ],
-                      const SizedBox(height: AppSpacing.xl),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          AppButton(
-                            label: 'Cancelar',
-                            variant: AppButtonVariant.secondary,
-                            onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          AppButton(label: 'Inscrever', loading: _salvando, onPressed: _salvar),
-                        ],
-                      ),
-                    ],
-                  ),
+    return _carregandoOpcoes
+        ? const SizedBox(
+            height: 100,
+            child: Center(child: LoadingSkeleton(width: 200, height: 16)),
+          )
+        : Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nova inscrição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+                const SizedBox(height: AppSpacing.lg),
+                AppSelect<String?>(
+                  label: 'Aluno',
+                  value: _alunoId,
+                  options: [
+                    for (final aluno in _alunos) AppSelectOption(value: aluno.id, label: aluno.nome),
+                  ],
+                  onChanged: (v) => setState(() => _alunoId = v),
+                  validator: (v) => v == null ? 'Selecione o aluno' : null,
                 ),
-        ),
-      ),
-    );
+                if (_erro != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppFormErrorBanner(_erro!),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: 'Cancelar',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    AppButton(label: 'Inscrever', loading: _salvando, onPressed: _salvar),
+                  ],
+                ),
+              ],
+            ),
+          );
   }
 }
 
@@ -1316,60 +1274,46 @@ class _AcoesTurmaAlunoDialogState extends ConsumerState<_AcoesTurmaAlunoDialog> 
     final colors = context.colors;
     final ativo = widget.turmaAluno.status == UserStatus.ativo;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.turmaAluno.alunoNome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  AppButton(
-                    label: ativo ? 'Sair da turma' : 'Reativar',
-                    icon: ativo ? AppIcons.block : AppIcons.circleCheck,
-                    variant: AppButtonVariant.secondary,
-                    loading: _salvando,
-                    onPressed: _alternarStatus,
-                  ),
-                  AppButton(
-                    label: 'Remover',
-                    icon: AppIcons.trash,
-                    variant: AppButtonVariant.danger,
-                    loading: _salvando,
-                    onPressed: _remover,
-                  ),
-                ],
-              ),
-              if (_erro != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                AppFormErrorBanner(_erro!),
-              ],
-              const SizedBox(height: AppSpacing.lg),
-              Align(
-                alignment: Alignment.centerRight,
-                child: AppButton(
-                  label: 'Fechar',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => Navigator.of(context).pop(false),
-                ),
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.turmaAluno.alunoNome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.lg),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            AppButton(
+              label: ativo ? 'Sair da turma' : 'Reativar',
+              icon: ativo ? AppIcons.block : AppIcons.circleCheck,
+              variant: AppButtonVariant.secondary,
+              loading: _salvando,
+              onPressed: _alternarStatus,
+            ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _salvando,
+              onPressed: _remover,
+            ),
+          ],
+        ),
+        if (_erro != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppFormErrorBanner(_erro!),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        Align(
+          alignment: Alignment.centerRight,
+          child: AppButton(
+            label: 'Fechar',
+            variant: AppButtonVariant.secondary,
+            onPressed: () => Navigator.of(context).pop(false),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1412,8 +1356,9 @@ class _AulasSectionState extends ConsumerState<_AulasSection> {
   }
 
   Future<void> _gerar() async {
-    final resultado = await showDialog<GerarAulasResultado>(
-      context: context,
+    final resultado = await showAppDialog<GerarAulasResultado>(
+      context,
+      maxWidth: 460,
       builder: (_) => _GerarAulasDialog(turmaId: widget.turmaId),
     );
     if (resultado == null) return;
@@ -1584,70 +1529,56 @@ class _GerarAulasDialogState extends ConsumerState<_GerarAulasDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Gerar aulas', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Gera as aulas de todas as recorrências ativas desta turma no período. '
-                  'Datas já geradas não são recriadas nem alteradas.',
-                  style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AppFormRow(children: [
-                  AppDateField(
-                    label: 'Início do período',
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                    lastDate: DateTime.now().add(const Duration(days: 730)),
-                    value: _dataInicio,
-                    onChanged: (v) => setState(() => _dataInicio = v!),
-                    validator: (v) => v == null ? 'Informe o início' : null,
-                  ),
-                  AppDateField(
-                    label: 'Fim do período',
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                    lastDate: DateTime.now().add(const Duration(days: 730)),
-                    value: _dataFim,
-                    onChanged: (v) => setState(() => _dataFim = v!),
-                    validator: (v) => v == null ? 'Informe o fim' : null,
-                  ),
-                ]),
-                if (_erro != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormErrorBanner(_erro!),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: 'Cancelar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _salvando ? null : () => Navigator.of(context).pop(null),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    AppButton(label: 'Gerar', loading: _salvando, onPressed: _gerar),
-                  ],
-                ),
-              ],
-            ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Gerar aulas', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Gera as aulas de todas as recorrências ativas desta turma no período. '
+            'Datas já geradas não são recriadas nem alteradas.',
+            style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          AppFormRow(children: [
+            AppDateField(
+              label: 'Início do período',
+              firstDate: DateTime.now().subtract(const Duration(days: 365)),
+              lastDate: DateTime.now().add(const Duration(days: 730)),
+              value: _dataInicio,
+              onChanged: (v) => setState(() => _dataInicio = v!),
+              validator: (v) => v == null ? 'Informe o início' : null,
+            ),
+            AppDateField(
+              label: 'Fim do período',
+              firstDate: DateTime.now().subtract(const Duration(days: 365)),
+              lastDate: DateTime.now().add(const Duration(days: 730)),
+              value: _dataFim,
+              onChanged: (v) => setState(() => _dataFim = v!),
+              validator: (v) => v == null ? 'Informe o fim' : null,
+            ),
+          ]),
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Cancelar',
+                variant: AppButtonVariant.secondary,
+                onPressed: _salvando ? null : () => Navigator.of(context).pop(null),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Gerar', loading: _salvando, onPressed: _gerar),
+            ],
+          ),
+        ],
       ),
     );
   }

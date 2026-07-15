@@ -5,6 +5,7 @@ import '../../tokens/app_radius.dart';
 import '../../tokens/app_spacing.dart';
 import '../../tokens/app_typography.dart';
 import '../buttons/app_button.dart';
+import 'app_dialog.dart';
 
 /// Tom do [AppConfirmDialog] — controla ícone e cor de destaque. Só
 /// [confirm] e [danger] têm uso real hoje (confirmar ação / excluir); os
@@ -55,8 +56,9 @@ class AppConfirmDialog extends StatelessWidget {
     String cancelLabel = 'Cancelar',
     AppConfirmDialogVariant variant = AppConfirmDialogVariant.confirm,
   }) {
-    return showDialog<bool>(
-      context: context,
+    return showAppDialog<bool>(
+      context,
+      maxWidth: 380,
       builder: (_) => AppConfirmDialog(
         title: title,
         description: description,
@@ -85,56 +87,42 @@ class AppConfirmDialog extends StatelessWidget {
       AppConfirmDialogVariant.error => colors.errorWash,
     };
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: toneWash,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  child: Icon(icon, size: 20, color: tone),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(title, style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(description, style: AppTypography.bodyMedium.copyWith(color: colors.textMuted)),
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AppButton(
-                    label: cancelLabel,
-                    variant: AppButtonVariant.secondary,
-                    onPressed: () => Navigator.of(context).pop(false),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  AppButton(
-                    label: confirmLabel,
-                    variant: confirmVariant,
-                    onPressed: () => Navigator.of(context).pop(true),
-                  ),
-                ],
-              ),
-            ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: toneWash,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Icon(icon, size: 20, color: tone),
           ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        Text(title, style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(description, style: AppTypography.bodyMedium.copyWith(color: colors.textMuted)),
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AppButton(
+              label: cancelLabel,
+              variant: AppButtonVariant.secondary,
+              onPressed: () => Navigator.of(context).pop(false),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppButton(
+              label: confirmLabel,
+              variant: confirmVariant,
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

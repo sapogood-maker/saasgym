@@ -230,7 +230,12 @@ class _NavItemState extends State<_NavItem> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 1),
+            // Docs/27: linha do item de navegação sobe de ~35px pra ~45px
+            // em telas de toque (relevante sobretudo dentro do `Drawer`
+            // mobile) — desktop mantém o padding original.
+            padding: EdgeInsets.symmetric(
+              vertical: context.isTouch ? AppSpacing.lg - 2 : AppSpacing.sm + 1,
+            ),
             child: Icon(destination.icon, size: 17, color: foreground),
           ),
           const SizedBox(width: AppSpacing.sm),

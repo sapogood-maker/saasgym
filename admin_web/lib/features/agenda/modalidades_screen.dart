@@ -87,16 +87,18 @@ class _ModalidadesScreenState extends ConsumerState<ModalidadesScreen> {
   }
 
   Future<void> _novaModalidade() async {
-    final criada = await showDialog<bool>(
-      context: context,
+    final criada = await showAppDialog<bool>(
+      context,
+      maxWidth: 420,
       builder: (_) => const _NovaModalidadeDialog(),
     );
     if (criada == true) _carregar();
   }
 
   Future<void> _abrirAcoes(Modalidade modalidade) async {
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 420,
       builder: (_) => _AcoesModalidadeDialog(modalidade: modalidade),
     );
     if (alterou == true) _carregar();
@@ -347,62 +349,48 @@ class _NovaModalidadeDialogState extends ConsumerState<_NovaModalidadeDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Nova modalidade', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.lg),
-                AppTextField(
-                  label: 'Nome',
-                  controller: _nomeController,
-                  validator: (v) => (v == null || v.trim().length < 2) ? 'Informe o nome' : null,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppTextField(
-                  label: 'Cor (opcional)',
-                  hintText: '#3B82F6',
-                  controller: _corController,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    final valido = RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(v.trim());
-                    return valido ? null : 'Formato inválido — use #RRGGBB';
-                  },
-                ),
-                if (_erro != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormErrorBanner(_erro!),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: 'Cancelar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
-                  ],
-                ),
-              ],
-            ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Nova modalidade', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.lg),
+          AppTextField(
+            label: 'Nome',
+            controller: _nomeController,
+            validator: (v) => (v == null || v.trim().length < 2) ? 'Informe o nome' : null,
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          AppTextField(
+            label: 'Cor (opcional)',
+            hintText: '#3B82F6',
+            controller: _corController,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              final valido = RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(v.trim());
+              return valido ? null : 'Formato inválido — use #RRGGBB';
+            },
+          ),
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Cancelar',
+                variant: AppButtonVariant.secondary,
+                onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -502,29 +490,15 @@ class _AcoesModalidadeDialogState extends ConsumerState<_AcoesModalidadeDialog> 
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.modalidade.nome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.lg),
-              if (_view == _AcaoView.menu) ..._menu(),
-              if (_view == _AcaoView.editar) ..._formEditar(),
-            ],
-          ),
-        ),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(widget.modalidade.nome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.lg),
+        if (_view == _AcaoView.menu) ..._menu(),
+        if (_view == _AcaoView.editar) ..._formEditar(),
+      ],
     );
   }
 

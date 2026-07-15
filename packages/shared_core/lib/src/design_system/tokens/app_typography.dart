@@ -47,6 +47,21 @@ abstract final class AppTypography {
     height: 1.5,
   );
 
+  /// Texto editável de campo de formulário (`AppTextField`/`AppSelect`/
+  /// `AppDateField`) em telas de toque — 16px, o limiar abaixo do qual
+  /// Safari/WebView em iOS faz auto-zoom da página ao focar um input
+  /// (docs/27, causa raiz do problema de digitação no celular). Só usado
+  /// quando `context.isTouch`; em desktop os campos continuam em
+  /// [bodyMedium] — o navegador desktop não tem esse comportamento de
+  /// zoom, então não há motivo pra mudar o texto lá (mantém a tela
+  /// pixel-idêntica ao que já existe).
+  static const inputText = TextStyle(
+    fontFamily: _fontFamily,
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    height: 1.5,
+  );
+
   /// Corpo de texto secundário/apoio (ex.: subtítulo de card, legenda).
   static const bodySmall = TextStyle(
     fontFamily: _fontFamily,

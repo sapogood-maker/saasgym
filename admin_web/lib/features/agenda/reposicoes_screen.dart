@@ -53,16 +53,18 @@ class _ReposicoesScreenState extends ConsumerState<ReposicoesScreen> {
   }
 
   Future<void> _aprovar(SolicitacaoReposicao solicitacao) async {
-    final aprovou = await showDialog<bool>(
-      context: context,
+    final aprovou = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _AprovarSolicitacaoDialog(solicitacao: solicitacao),
     );
     if (aprovou == true) _carregar();
   }
 
   Future<void> _rejeitar(SolicitacaoReposicao solicitacao) async {
-    final rejeitou = await showDialog<bool>(
-      context: context,
+    final rejeitou = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _RejeitarSolicitacaoDialog(solicitacao: solicitacao),
     );
     if (rejeitou == true) _carregar();
@@ -300,79 +302,68 @@ class _AprovarSolicitacaoDialogState extends ConsumerState<_AprovarSolicitacaoDi
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Aprovar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${widget.solicitacao.alunoNome} — escolha a aula de destino (próximos 90 dias).',
-                style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              FutureBuilder<List<Aula>>(
-                future: _aulasFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LoadingSkeleton(width: double.infinity, height: 48);
-                  }
-                  if (snapshot.hasError) {
-                    return EmptyState(
-                      icon: AppIcons.alert,
-                      title: 'Não foi possível carregar as aulas.',
-                    );
-                  }
-                  final aulas = snapshot.data!;
-                  if (aulas.isEmpty) {
-                    return const EmptyState(
-                      icon: AppIcons.calendar,
-                      title: 'Nenhuma aula agendada nos próximos 90 dias',
-                    );
-                  }
-                  return AppSelect<String?>(
-                    label: 'Aula de destino',
-                    value: _aulaDestinoId,
-                    options: [
-                      for (final aula in aulas)
-                        AppSelectOption(
-                          value: aula.id,
-                          label: '${dataCurtaFormat.format(aula.data)} · ${aula.turmaNome} · ${aula.horaInicio}',
-                        ),
-                    ],
-                    onChanged: (v) => setState(() => _aulaDestinoId = v),
-                  );
-                },
-              ),
-              if (_erro != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                AppFormErrorBanner(_erro!),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AppButton(
-                    label: 'Cancelar',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  AppButton(label: 'Aprovar', loading: _salvando, onPressed: _confirmar),
-                ],
-              ),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Aprovar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '${widget.solicitacao.alunoNome} — escolha a aula de destino (próximos 90 dias).',
+          style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        FutureBuilder<List<Aula>>(
+          future: _aulasFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const LoadingSkeleton(width: double.infinity, height: 48);
+            }
+            if (snapshot.hasError) {
+              return EmptyState(
+                icon: AppIcons.alert,
+                title: 'Não foi possível carregar as aulas.',
+              );
+            }
+            final aulas = snapshot.data!;
+            if (aulas.isEmpty) {
+              return const EmptyState(
+                icon: AppIcons.calendar,
+                title: 'Nenhuma aula agendada nos próximos 90 dias',
+              );
+            }
+            return AppSelect<String?>(
+              label: 'Aula de destino',
+              value: _aulaDestinoId,
+              options: [
+                for (final aula in aulas)
+                  AppSelectOption(
+                    value: aula.id,
+                    label: '${dataCurtaFormat.format(aula.data)} · ${aula.turmaNome} · ${aula.horaInicio}',
+                  ),
+              ],
+              onChanged: (v) => setState(() => _aulaDestinoId = v),
+            );
+          },
+        ),
+        if (_erro != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppFormErrorBanner(_erro!),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AppButton(
+              label: 'Cancelar',
+              variant: AppButtonVariant.secondary,
+              onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppButton(label: 'Aprovar', loading: _salvando, onPressed: _confirmar),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -417,52 +408,41 @@ class _RejeitarSolicitacaoDialogState extends ConsumerState<_RejeitarSolicitacao
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Rejeitar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Solicitação de ${widget.solicitacao.alunoNome}.',
-                style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              AppTextField(label: 'Motivo (opcional)', controller: _motivoController, maxLines: 2),
-              if (_erro != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                AppFormErrorBanner(_erro!),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AppButton(
-                    label: 'Cancelar',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  AppButton(
-                    label: 'Rejeitar',
-                    variant: AppButtonVariant.danger,
-                    loading: _salvando,
-                    onPressed: _confirmar,
-                  ),
-                ],
-              ),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Rejeitar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Solicitação de ${widget.solicitacao.alunoNome}.',
+          style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        AppTextField(label: 'Motivo (opcional)', controller: _motivoController, maxLines: 2),
+        if (_erro != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppFormErrorBanner(_erro!),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AppButton(
+              label: 'Cancelar',
+              variant: AppButtonVariant.secondary,
+              onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppButton(
+              label: 'Rejeitar',
+              variant: AppButtonVariant.danger,
+              loading: _salvando,
+              onPressed: _confirmar,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

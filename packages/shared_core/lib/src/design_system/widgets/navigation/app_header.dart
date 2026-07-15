@@ -107,7 +107,9 @@ class _HeaderIconButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.sm),
           hoverColor: colors.cardRaised,
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
+            // Docs/27: 44×44 em telas de toque (era 34×34 fixo); desktop
+            // mantém o padding original.
+            padding: EdgeInsets.all(context.isTouch ? AppSpacing.lg - 3 : AppSpacing.sm),
             child: Icon(icon, size: 18, color: colors.textMuted),
           ),
         ),
@@ -189,7 +191,9 @@ class _NotificationsButton extends StatelessWidget {
                     sprintTag: 'EM DESENVOLVIMENTO',
                   ),
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
+            // Docs/27: 44×44 em telas de toque (era 34×34 fixo); desktop
+            // mantém o padding original.
+            padding: EdgeInsets.all(context.isTouch ? AppSpacing.lg - 3 : AppSpacing.sm),
             child: Stack(
               clipBehavior: Clip.none,
               children: [

@@ -46,6 +46,9 @@ class AppSelect<T> extends FormField<T> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
+               // Docs/27: mesmo critério de AppTextField — `inputText`
+               // (16px) só em telas de toque, desktop mantém `bodyMedium`.
+               final textStyle = context.isTouch ? AppTypography.inputText : AppTypography.bodyMedium;
                return AppFieldFocusTracker(
                  builder: (isFocused) => AppFieldChrome(
                    label: label,
@@ -61,7 +64,7 @@ class AppSelect<T> extends FormField<T> {
                        icon: Icon(AppIcons.chevronDown, size: 16, color: colors.textFaint),
                        dropdownColor: colors.card,
                        borderRadius: BorderRadius.circular(10),
-                       style: AppTypography.bodyMedium.copyWith(color: colors.text),
+                       style: textStyle.copyWith(color: colors.text),
                        items: [
                          for (final option in options)
                            DropdownMenuItem<T>(value: option.value, child: Text(option.label)),

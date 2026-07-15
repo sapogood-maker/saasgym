@@ -183,8 +183,9 @@ class _MensalidadesScreenState extends ConsumerState<MensalidadesScreen> {
   }
 
   Future<void> _abrirAcoes(Mensalidade mensalidade) async {
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 420,
       builder: (_) => _AcoesMensalidadeDialog(mensalidade: mensalidade),
     );
     if (alterou == true) _carregar();
@@ -565,36 +566,22 @@ class _AcoesMensalidadeDialogState extends ConsumerState<_AcoesMensalidadeDialog
     final colors = context.colors;
     final mensalidade = widget.mensalidade;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(mensalidade.alunoNome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Vencimento ${dataCurtaFormat.format(mensalidade.dataVencimento)} · ${_formatoMoeda.format(mensalidade.valorFinal)}',
-                style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (_view == _AcaoView.menu) ..._menu(mensalidade),
-              if (_view == _AcaoView.pagar) ..._formPagar(),
-              if (_view == _AcaoView.editar) ..._formEditar(),
-              if (_view == _AcaoView.cancelar) ..._formCancelar(),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(mensalidade.alunoNome, style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Vencimento ${dataCurtaFormat.format(mensalidade.dataVencimento)} · ${_formatoMoeda.format(mensalidade.valorFinal)}',
+          style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        if (_view == _AcaoView.menu) ..._menu(mensalidade),
+        if (_view == _AcaoView.pagar) ..._formPagar(),
+        if (_view == _AcaoView.editar) ..._formEditar(),
+        if (_view == _AcaoView.cancelar) ..._formCancelar(),
+      ],
     );
   }
 

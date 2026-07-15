@@ -29,6 +29,7 @@ export 'widgets/inputs/app_text_field.dart';
 export 'widgets/layout/app_form_row.dart';
 export 'widgets/navigation/app_pagination.dart';
 export 'widgets/overlays/app_confirm_dialog.dart';
+export 'widgets/overlays/app_dialog.dart';
 export 'widgets/navigation/app_breadcrumb.dart';
 export 'widgets/navigation/app_detail_header.dart';
 export 'widgets/navigation/app_header.dart';

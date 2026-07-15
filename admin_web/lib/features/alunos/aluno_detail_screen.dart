@@ -388,8 +388,9 @@ class _AvaliacoesFisicasSectionState extends ConsumerState<_AvaliacoesFisicasSec
   }
 
   Future<void> _nova() async {
-    final criada = await showDialog<bool>(
-      context: context,
+    final criada = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _NovaAvaliacaoFisicaDialog(alunoId: widget.alunoId),
     );
     if (criada == true) {
@@ -593,88 +594,74 @@ class _NovaAvaliacaoFisicaDialogState extends ConsumerState<_NovaAvaliacaoFisica
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Nova avaliação física', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.lg),
-                AppDateField(
-                  label: 'Data',
-                  firstDate: DateTime.now().subtract(const Duration(days: 3650)),
-                  lastDate: DateTime.now(),
-                  value: _data,
-                  onChanged: (v) => setState(() => _data = v!),
-                  validator: (v) => v == null ? 'Informe a data' : null,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppFormRow(children: [
-                  AppTextField(
-                    label: 'Peso (kg)',
-                    hintText: '70,0',
-                    controller: _pesoController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Informe o peso';
-                      final numero = double.tryParse(v.trim().replaceAll(',', '.'));
-                      if (numero == null || numero <= 0) return 'Informe um peso válido';
-                      return null;
-                    },
-                  ),
-                  AppTextField(
-                    label: 'Altura (cm)',
-                    hintText: '175',
-                    controller: _alturaController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Informe a altura';
-                      final numero = double.tryParse(v.trim().replaceAll(',', '.'));
-                      if (numero == null || numero <= 0) return 'Informe uma altura válida';
-                      return null;
-                    },
-                  ),
-                ]),
-                const SizedBox(height: AppSpacing.md),
-                AppTextField(
-                  label: 'Observações',
-                  hintText: 'Opcional',
-                  controller: _observacoesController,
-                  maxLines: 2,
-                ),
-                if (_erro != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormErrorBanner(_erro!),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: 'Cancelar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _salvando ? null : () => Navigator.of(context).pop(null),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
-                  ],
-                ),
-              ],
-            ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Nova avaliação física', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.lg),
+          AppDateField(
+            label: 'Data',
+            firstDate: DateTime.now().subtract(const Duration(days: 3650)),
+            lastDate: DateTime.now(),
+            value: _data,
+            onChanged: (v) => setState(() => _data = v!),
+            validator: (v) => v == null ? 'Informe a data' : null,
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          AppFormRow(children: [
+            AppTextField(
+              label: 'Peso (kg)',
+              hintText: '70,0',
+              controller: _pesoController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Informe o peso';
+                final numero = double.tryParse(v.trim().replaceAll(',', '.'));
+                if (numero == null || numero <= 0) return 'Informe um peso válido';
+                return null;
+              },
+            ),
+            AppTextField(
+              label: 'Altura (cm)',
+              hintText: '175',
+              controller: _alturaController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Informe a altura';
+                final numero = double.tryParse(v.trim().replaceAll(',', '.'));
+                if (numero == null || numero <= 0) return 'Informe uma altura válida';
+                return null;
+              },
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.md),
+          AppTextField(
+            label: 'Observações',
+            hintText: 'Opcional',
+            controller: _observacoesController,
+            maxLines: 2,
+          ),
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Cancelar',
+                variant: AppButtonVariant.secondary,
+                onPressed: _salvando ? null : () => Navigator.of(context).pop(null),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -111,8 +111,9 @@ class _CaixaScreenState extends ConsumerState<CaixaScreen> {
   }
 
   Future<void> _novoLancamento() async {
-    final criado = await showDialog<bool>(
-      context: context,
+    final criado = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => const _NovoLancamentoDialog(),
     );
     if (criado == true) _carregar();
@@ -128,8 +129,9 @@ class _CaixaScreenState extends ConsumerState<CaixaScreen> {
       );
       return;
     }
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _AcoesLancamentoDialog(lancamento: lancamento),
     );
     if (alterou == true) _carregar();
@@ -452,103 +454,89 @@ class _NovoLancamentoDialogState extends ConsumerState<_NovoLancamentoDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Novo lançamento', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.lg),
-                AppFormRow(
-                  children: [
-                    AppSelect<LancamentoTipo>(
-                      label: 'Tipo',
-                      value: _tipo,
-                      options: const [
-                        AppSelectOption(value: LancamentoTipo.receita, label: 'Receita'),
-                        AppSelectOption(value: LancamentoTipo.despesa, label: 'Despesa'),
-                      ],
-                      onChanged: (tipo) => setState(() => _tipo = tipo ?? _tipo),
-                    ),
-                    AppDateField(
-                      label: 'Data',
-                      value: _data,
-                      firstDate: DateTime(DateTime.now().year - 5),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                      onChanged: (data) => setState(() => _data = data ?? _data),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppTextField(
-                  label: 'Descrição',
-                  controller: _descricaoController,
-                  validator: (v) => (v == null || v.trim().length < 2) ? 'Informe a descrição' : null,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppFormRow(
-                  children: [
-                    AppTextField(label: 'Categoria (opcional)', controller: _categoriaController),
-                    AppTextField(
-                      label: 'Valor',
-                      controller: _valorController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) {
-                        final numero = double.tryParse((v ?? '').trim().replaceAll(',', '.'));
-                        if (numero == null || numero <= 0) return 'Informe um valor válido';
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppSelect<FormaPagamento?>(
-                  label: 'Forma de pagamento (opcional)',
-                  value: _formaPagamento,
-                  options: const [
-                    AppSelectOption(value: null, label: 'Não informar'),
-                    AppSelectOption(value: FormaPagamento.dinheiro, label: 'Dinheiro'),
-                    AppSelectOption(value: FormaPagamento.pix, label: 'PIX'),
-                    AppSelectOption(value: FormaPagamento.cartaoCredito, label: 'Cartão de crédito'),
-                    AppSelectOption(value: FormaPagamento.cartaoDebito, label: 'Cartão de débito'),
-                    AppSelectOption(value: FormaPagamento.boleto, label: 'Boleto'),
-                    AppSelectOption(value: FormaPagamento.outro, label: 'Outro'),
-                  ],
-                  onChanged: (v) => setState(() => _formaPagamento = v),
-                ),
-                if (_erro != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormErrorBanner(_erro!),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Novo lançamento', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.lg),
+          AppFormRow(
+            children: [
+              AppSelect<LancamentoTipo>(
+                label: 'Tipo',
+                value: _tipo,
+                options: const [
+                  AppSelectOption(value: LancamentoTipo.receita, label: 'Receita'),
+                  AppSelectOption(value: LancamentoTipo.despesa, label: 'Despesa'),
                 ],
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: 'Cancelar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
-                  ],
-                ),
-              ],
-            ),
+                onChanged: (tipo) => setState(() => _tipo = tipo ?? _tipo),
+              ),
+              AppDateField(
+                label: 'Data',
+                value: _data,
+                firstDate: DateTime(DateTime.now().year - 5),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+                onChanged: (data) => setState(() => _data = data ?? _data),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          AppTextField(
+            label: 'Descrição',
+            controller: _descricaoController,
+            validator: (v) => (v == null || v.trim().length < 2) ? 'Informe a descrição' : null,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppFormRow(
+            children: [
+              AppTextField(label: 'Categoria (opcional)', controller: _categoriaController),
+              AppTextField(
+                label: 'Valor',
+                controller: _valorController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) {
+                  final numero = double.tryParse((v ?? '').trim().replaceAll(',', '.'));
+                  if (numero == null || numero <= 0) return 'Informe um valor válido';
+                  return null;
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSelect<FormaPagamento?>(
+            label: 'Forma de pagamento (opcional)',
+            value: _formaPagamento,
+            options: const [
+              AppSelectOption(value: null, label: 'Não informar'),
+              AppSelectOption(value: FormaPagamento.dinheiro, label: 'Dinheiro'),
+              AppSelectOption(value: FormaPagamento.pix, label: 'PIX'),
+              AppSelectOption(value: FormaPagamento.cartaoCredito, label: 'Cartão de crédito'),
+              AppSelectOption(value: FormaPagamento.cartaoDebito, label: 'Cartão de débito'),
+              AppSelectOption(value: FormaPagamento.boleto, label: 'Boleto'),
+              AppSelectOption(value: FormaPagamento.outro, label: 'Outro'),
+            ],
+            onChanged: (v) => setState(() => _formaPagamento = v),
+          ),
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Cancelar',
+                variant: AppButtonVariant.secondary,
+                onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -653,34 +641,20 @@ class _AcoesLancamentoDialogState extends ConsumerState<_AcoesLancamentoDialog> 
     final colors = context.colors;
     final lancamento = widget.lancamento;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(lancamento.descricao, style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${dataCurtaFormat.format(lancamento.data)} · ${_formatoMoeda.format(lancamento.valor)}',
-                style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              if (_view == _AcaoView.menu) ..._menu(),
-              if (_view == _AcaoView.editar) ..._formEditar(),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(lancamento.descricao, style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '${dataCurtaFormat.format(lancamento.data)} · ${_formatoMoeda.format(lancamento.valor)}',
+          style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        if (_view == _AcaoView.menu) ..._menu(),
+        if (_view == _AcaoView.editar) ..._formEditar(),
+      ],
     );
   }
 

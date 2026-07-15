@@ -198,16 +198,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Future<void> _abrirAcoes(Aula aula) async {
-    final alterou = await showDialog<bool>(
-      context: context,
+    final alterou = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _AulaAcoesDialog(aula: aula, professores: _professores, turma: _turmaDe(aula.turmaId)),
     );
     if (alterou == true) _carregar();
   }
 
   Future<void> _novaAulaExtra() async {
-    final criada = await showDialog<bool>(
-      context: context,
+    final criada = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _NovaAulaExtraDialog(
         turmas: _turmas,
         professores: _professores,
@@ -1023,8 +1025,9 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
   }
 
   Future<void> _abrirNovaSolicitacao(AulaAluno aulaAluno) async {
-    final criada = await showDialog<bool>(
-      context: context,
+    final criada = await showAppDialog<bool>(
+      context,
+      maxWidth: 460,
       builder: (_) => _NovaSolicitacaoReposicaoDialog(aulaAluno: aulaAluno),
     );
     if (criada == true && mounted) {
@@ -1095,33 +1098,22 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
     final colors = context.colors;
     final aula = widget.aula;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${dataCurtaFormat.format(aula.data)} · ${aula.horaInicio}',
-                style: AppTypography.titleLarge.copyWith(color: colors.text),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(aula.turmaNome, style: AppTypography.bodyMedium.copyWith(color: colors.textMuted)),
-              const SizedBox(height: AppSpacing.lg),
-              if (_view == _AcaoAulaView.menu) ..._menu(colors),
-              if (_view == _AcaoAulaView.cancelar) ..._formCancelar(),
-              if (_view == _AcaoAulaView.substituto) ..._formSubstituto(),
-              if (_view == _AcaoAulaView.frequencia) ..._viewFrequencia(colors),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${dataCurtaFormat.format(aula.data)} · ${aula.horaInicio}',
+          style: AppTypography.titleLarge.copyWith(color: colors.text),
         ),
-      ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(aula.turmaNome, style: AppTypography.bodyMedium.copyWith(color: colors.textMuted)),
+        const SizedBox(height: AppSpacing.lg),
+        if (_view == _AcaoAulaView.menu) ..._menu(colors),
+        if (_view == _AcaoAulaView.cancelar) ..._formCancelar(),
+        if (_view == _AcaoAulaView.substituto) ..._formSubstituto(),
+        if (_view == _AcaoAulaView.frequencia) ..._viewFrequencia(colors),
+      ],
     );
   }
 
@@ -1446,47 +1438,36 @@ class _NovaSolicitacaoReposicaoDialogState extends ConsumerState<_NovaSolicitaca
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Solicitar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${widget.aulaAluno.alunoNome} — a aula de destino é escolhida na aprovação, na tela "Reposições".',
-                style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              AppTextField(label: 'Observações (opcional)', controller: _observacoesController, maxLines: 2),
-              if (_erro != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                AppFormErrorBanner(_erro!),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  AppButton(
-                    label: 'Cancelar',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  AppButton(label: 'Solicitar', loading: _salvando, onPressed: _confirmar),
-                ],
-              ),
-            ],
-          ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Solicitar reposição', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '${widget.aulaAluno.alunoNome} — a aula de destino é escolhida na aprovação, na tela "Reposições".',
+          style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        AppTextField(label: 'Observações (opcional)', controller: _observacoesController, maxLines: 2),
+        if (_erro != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AppFormErrorBanner(_erro!),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AppButton(
+              label: 'Cancelar',
+              variant: AppButtonVariant.secondary,
+              onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppButton(label: 'Solicitar', loading: _salvando, onPressed: _confirmar),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -1565,111 +1546,98 @@ class _NovaAulaExtraDialogState extends ConsumerState<_NovaAulaExtraDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg), side: BorderSide(color: colors.border)),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nova aula extra', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Uma aula avulsa, independente de recorrência.',
-                    style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AppSelect<String?>(
-                    label: 'Turma',
-                    value: _turmaId,
-                    options: [for (final turma in widget.turmas) AppSelectOption(value: turma.id, label: turma.nome)],
-                    onChanged: (v) => setState(() => _turmaId = v),
-                    validator: (v) => v == null ? 'Selecione a turma' : null,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppDateField(
-                    label: 'Data',
-                    firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                    value: _data,
-                    onChanged: (v) => setState(() => _data = v!),
-                    validator: (v) => v == null ? 'Informe a data' : null,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormRow(children: [
-                    AppTextField(
-                      label: 'Hora de início',
-                      controller: _horaInicioController,
-                      validator: (v) {
-                        final valido = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch((v ?? '').trim());
-                        return valido ? null : 'Use o formato HH:mm';
-                      },
-                    ),
-                    AppTextField(
-                      label: 'Duração (min)',
-                      controller: _duracaoMinutosController,
-                      keyboardType: TextInputType.number,
-                      validator: (v) {
-                        final numero = int.tryParse((v ?? '').trim());
-                        if (numero == null || numero < 1) return 'Informe um número válido';
-                        return null;
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: AppSpacing.md),
-                  AppSelect<String?>(
-                    label: 'Professor (opcional — usa o titular da turma se não escolher)',
-                    value: _professorId,
-                    options: [
-                      const AppSelectOption(value: null, label: 'Usar professor titular da turma'),
-                      for (final professor in widget.professores)
-                        AppSelectOption(value: professor.id, label: professor.nome),
-                    ],
-                    onChanged: (v) => setState(() => _professorId = v),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  AppTextField(
-                    label: 'Capacidade máxima (opcional)',
-                    hintText: 'Usa a capacidade da turma',
-                    controller: _capacidadeMaximaController,
-                    keyboardType: TextInputType.number,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
-                      final numero = int.tryParse(v.trim());
-                      if (numero == null || numero <= 0) return 'Informe um número válido';
-                      return null;
-                    },
-                  ),
-                  if (_erro != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    AppFormErrorBanner(_erro!),
-                  ],
-                  const SizedBox(height: AppSpacing.xl),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      AppButton(
-                        label: 'Cancelar',
-                        variant: AppButtonVariant.secondary,
-                        onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      AppButton(label: 'Criar', loading: _salvando, onPressed: _salvar),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Nova aula extra', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Uma aula avulsa, independente de recorrência.',
+            style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          AppSelect<String?>(
+            label: 'Turma',
+            value: _turmaId,
+            options: [for (final turma in widget.turmas) AppSelectOption(value: turma.id, label: turma.nome)],
+            onChanged: (v) => setState(() => _turmaId = v),
+            validator: (v) => v == null ? 'Selecione a turma' : null,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppDateField(
+            label: 'Data',
+            firstDate: DateTime.now().subtract(const Duration(days: 365)),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            value: _data,
+            onChanged: (v) => setState(() => _data = v!),
+            validator: (v) => v == null ? 'Informe a data' : null,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppFormRow(children: [
+            AppTextField(
+              label: 'Hora de início',
+              controller: _horaInicioController,
+              validator: (v) {
+                final valido = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch((v ?? '').trim());
+                return valido ? null : 'Use o formato HH:mm';
+              },
+            ),
+            AppTextField(
+              label: 'Duração (min)',
+              controller: _duracaoMinutosController,
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                final numero = int.tryParse((v ?? '').trim());
+                if (numero == null || numero < 1) return 'Informe um número válido';
+                return null;
+              },
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.md),
+          AppSelect<String?>(
+            label: 'Professor (opcional — usa o titular da turma se não escolher)',
+            value: _professorId,
+            options: [
+              const AppSelectOption(value: null, label: 'Usar professor titular da turma'),
+              for (final professor in widget.professores)
+                AppSelectOption(value: professor.id, label: professor.nome),
+            ],
+            onChanged: (v) => setState(() => _professorId = v),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppTextField(
+            label: 'Capacidade máxima (opcional)',
+            hintText: 'Usa a capacidade da turma',
+            controller: _capacidadeMaximaController,
+            keyboardType: TextInputType.number,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              final numero = int.tryParse(v.trim());
+              if (numero == null || numero <= 0) return 'Informe um número válido';
+              return null;
+            },
+          ),
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Cancelar',
+                variant: AppButtonVariant.secondary,
+                onPressed: _salvando ? null : () => Navigator.of(context).pop(false),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Criar', loading: _salvando, onPressed: _salvar),
+            ],
+          ),
+        ],
       ),
     );
   }

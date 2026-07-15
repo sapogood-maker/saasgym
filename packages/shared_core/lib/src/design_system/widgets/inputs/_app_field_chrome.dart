@@ -70,7 +70,14 @@ class AppFieldChrome extends StatelessWidget {
             border: Border.all(color: borderColor, width: hasError || focused ? 1.5 : 1),
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          // Altura de toque (docs/27): `md` (12) em telas de toque garante
+          // ≈48px de área tocável somado à linha de 16px do `inputText`
+          // (≥44px recomendado); desktop mantém `sm` (8), pixel-idêntico ao
+          // que já existia.
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: context.isTouch ? AppSpacing.md : AppSpacing.sm,
+          ),
           child: Row(
             children: [
               if (prefixIcon != null) ...[

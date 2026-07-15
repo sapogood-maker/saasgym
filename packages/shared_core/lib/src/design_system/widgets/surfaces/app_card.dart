@@ -45,7 +45,11 @@ class AppCard extends StatelessWidget {
   /// de hover/pressed) — usar quando o card representa uma navegação.
   final VoidCallback? onTap;
 
-  final EdgeInsetsGeometry padding;
+  /// Nulo usa o padrão do componente — `AppSpacing.xl` (24) em desktop,
+  /// `AppSpacing.lg` (16) em telas de toque (docs/27: mais espaço útil
+  /// numa tela de 375px). Quem passa um valor explícito continua com esse
+  /// valor em qualquer tela, sem esse ajuste automático.
+  final EdgeInsetsGeometry? padding;
 
   const AppCard({
     super.key,
@@ -56,15 +60,17 @@ class AppCard extends StatelessWidget {
     this.footer,
     this.loading = false,
     this.onTap,
-    this.padding = const EdgeInsets.all(AppSpacing.xl),
+    this.padding,
   });
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final effectivePadding = padding ??
+        EdgeInsets.all(context.isTouch ? AppSpacing.lg : AppSpacing.xl);
 
     final content = Padding(
-      padding: padding,
+      padding: effectivePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

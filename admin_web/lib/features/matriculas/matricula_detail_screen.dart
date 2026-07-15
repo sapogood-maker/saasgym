@@ -108,8 +108,9 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
   }
 
   Future<void> _cancelar() async {
-    final resultado = await showDialog<_CancelarPayload>(
-      context: context,
+    final resultado = await showAppDialog<_CancelarPayload>(
+      context,
+      maxWidth: 420,
       builder: (_) => const _CancelarMatriculaDialog(),
     );
     if (resultado == null || !mounted) return;
@@ -482,72 +483,58 @@ class _CancelarMatriculaDialogState extends State<_CancelarMatriculaDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.card,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Cancelar matrícula', style: AppTypography.titleLarge.copyWith(color: colors.text)),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Encerramento definitivo — preserva o histórico pra métricas de churn.',
-                  style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AppSelect<MotivoCancelamento?>(
-                  label: 'Motivo',
-                  value: _motivo,
-                  options: const [
-                    AppSelectOption(value: MotivoCancelamento.alunoSolicitou, label: 'Aluno solicitou'),
-                    AppSelectOption(value: MotivoCancelamento.inadimplencia, label: 'Inadimplência'),
-                    AppSelectOption(value: MotivoCancelamento.academiaCancelou, label: 'Academia cancelou'),
-                    AppSelectOption(value: MotivoCancelamento.outro, label: 'Outro'),
-                  ],
-                  onChanged: (v) => setState(() => _motivo = v),
-                ),
-                if (_motivo == MotivoCancelamento.outro) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppTextField(
-                    label: 'Detalhe',
-                    hintText: 'Descreva o motivo',
-                    controller: _detalheController,
-                    maxLines: 2,
-                    validator: (v) => (v == null || v.trim().length < 3) ? 'Detalhe o motivo' : null,
-                  ),
-                ],
-                if (_erro != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  AppFormErrorBanner(_erro!),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AppButton(
-                      label: 'Voltar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    AppButton(label: 'Confirmar cancelamento', variant: AppButtonVariant.danger, onPressed: _confirmar),
-                  ],
-                ),
-              ],
-            ),
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Cancelar matrícula', style: AppTypography.titleLarge.copyWith(color: colors.text)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Encerramento definitivo — preserva o histórico pra métricas de churn.',
+            style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          AppSelect<MotivoCancelamento?>(
+            label: 'Motivo',
+            value: _motivo,
+            options: const [
+              AppSelectOption(value: MotivoCancelamento.alunoSolicitou, label: 'Aluno solicitou'),
+              AppSelectOption(value: MotivoCancelamento.inadimplencia, label: 'Inadimplência'),
+              AppSelectOption(value: MotivoCancelamento.academiaCancelou, label: 'Academia cancelou'),
+              AppSelectOption(value: MotivoCancelamento.outro, label: 'Outro'),
+            ],
+            onChanged: (v) => setState(() => _motivo = v),
+          ),
+          if (_motivo == MotivoCancelamento.outro) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Detalhe',
+              hintText: 'Descreva o motivo',
+              controller: _detalheController,
+              maxLines: 2,
+              validator: (v) => (v == null || v.trim().length < 3) ? 'Detalhe o motivo' : null,
+            ),
+          ],
+          if (_erro != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppFormErrorBanner(_erro!),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              AppButton(
+                label: 'Voltar',
+                variant: AppButtonVariant.secondary,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              AppButton(label: 'Confirmar cancelamento', variant: AppButtonVariant.danger, onPressed: _confirmar),
+            ],
+          ),
+        ],
       ),
     );
   }

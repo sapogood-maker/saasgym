@@ -41,6 +41,11 @@ class AppTextField extends FormField<String> {
            return Builder(
              builder: (context) {
                final colors = context.colors;
+               // Docs/27: texto do campo sobe pra `inputText` (16px) só em
+               // telas de toque — é o limiar que evita o auto-zoom do
+               // navegador ao focar; desktop mantém `bodyMedium`, sem
+               // nenhuma mudança visual.
+               final textStyle = context.isTouch ? AppTypography.inputText : AppTypography.bodyMedium;
                return AppFieldFocusTracker(
                  builder: (isFocused) => AppFieldChrome(
                    label: label,
@@ -55,14 +60,14 @@ class AppTextField extends FormField<String> {
                      obscureText: obscureText,
                      maxLines: maxLines,
                      keyboardType: keyboardType,
-                     style: AppTypography.bodyMedium.copyWith(color: colors.text),
+                     style: textStyle.copyWith(color: colors.text),
                      cursorColor: colors.primary,
                      decoration: InputDecoration(
                        border: InputBorder.none,
                        isDense: true,
                        isCollapsed: true,
                        hintText: hintText,
-                       hintStyle: AppTypography.bodyMedium.copyWith(color: colors.textFaint),
+                       hintStyle: textStyle.copyWith(color: colors.textFaint),
                      ),
                      onChanged: (value) {
                        field.didChange(value);
