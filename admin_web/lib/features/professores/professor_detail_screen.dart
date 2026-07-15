@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../../routing/back_navigation.dart';
+
 /// Painel de detalhe do professor — Sprint 3, reescrita 1:1 do padrão
 /// consolidado por `AlunoDetailScreen` (Sprint 2, MS5). As seções futuras
 /// não são as mesmas de Aluno (Turmas/Financeiro fazem sentido para um
@@ -34,6 +36,10 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
     setState(() {
       _future = ref.read(professoresApiProvider).get(widget.professorId);
     });
+  }
+
+  void _voltar([bool? alterado]) {
+    context.backToList('/professores', result: alterado ?? _alterado);
   }
 
   Future<void> _alternarStatus(Professor professor) async {
@@ -70,7 +76,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
     try {
       await ref.read(professoresApiProvider).remove(professor.id);
       if (mounted) {
-        context.pop(true);
+        _voltar(true);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -88,7 +94,7 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.pop(_alterado);
+          _voltar();
         }
       },
       // Rota fora do ShellRoute (tela cheia) — precisa do próprio Scaffold,
@@ -102,14 +108,21 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _ProfessorPainelSkeleton();
+                  return _ProfessorPainelSkeleton(onBack: _voltar);
                 }
                 if (snapshot.hasError) {
-                  return EmptyState(
-                    icon: AppIcons.alert,
-                    title: 'Não foi possível carregar o professor.',
-                    actionLabel: 'Tentar novamente',
-                    onAction: _carregar,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppBackLink(label: 'Professores', onTap: _voltar),
+                      const SizedBox(height: AppSpacing.lg),
+                      EmptyState(
+                        icon: AppIcons.alert,
+                        title: 'Não foi possível carregar o professor.',
+                        actionLabel: 'Tentar novamente',
+                        onAction: _carregar,
+                      ),
+                    ],
                   );
                 }
                 return _painel(context, snapshot.data!);
@@ -125,79 +138,48 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
     final colors = context.colors;
     final ativo = professor.status == UserStatus.ativo;
 
-    final info = Row(
-      children: [
-        AppAvatarPicker(imageUrl: professor.fotoUrl, radius: 40, enabled: false),
-        const SizedBox(width: AppSpacing.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                professor.nome,
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              AppBadge(
-                ativo ? 'Ativo' : 'Inativo',
-                tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    final acoes = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        AppButton(
-          label: 'Editar',
-          icon: AppIcons.edit,
-          onPressed: (_processandoStatus || _removendo)
-              ? null
-              : () async {
-                  final resultado = await context.push<bool>('/professores/${professor.id}/editar');
-                  if (resultado == true) {
-                    _alterado = true;
-                    _carregar();
-                  }
-                },
-        ),
-        AppButton(
-          label: ativo ? 'Inativar' : 'Reativar',
-          icon: ativo ? AppIcons.block : AppIcons.circleCheck,
-          variant: AppButtonVariant.secondary,
-          loading: _processandoStatus,
-          onPressed: _removendo ? null : () => _alternarStatus(professor),
-        ),
-        AppButton(
-          label: 'Remover',
-          icon: AppIcons.trash,
-          variant: AppButtonVariant.danger,
-          loading: _removendo,
-          onPressed: _processandoStatus ? null : () => _excluir(professor),
-        ),
-      ],
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (context.isMobile)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [info, const SizedBox(height: AppSpacing.lg), acoes],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: info), const SizedBox(width: AppSpacing.lg), acoes],
+        AppDetailHeader(
+          listLabel: 'Professores',
+          onBack: _voltar,
+          leading: AppAvatarPicker(imageUrl: professor.fotoUrl, radius: 40, enabled: false),
+          title: professor.nome,
+          trailing: AppBadge(
+            ativo ? 'Ativo' : 'Inativo',
+            tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
           ),
+          actions: [
+            AppButton(
+              label: 'Editar',
+              icon: AppIcons.edit,
+              onPressed: (_processandoStatus || _removendo)
+                  ? null
+                  : () async {
+                      final resultado = await context.push<bool>('/professores/${professor.id}/editar');
+                      if (resultado == true) {
+                        _alterado = true;
+                        _carregar();
+                      }
+                    },
+            ),
+            AppButton(
+              label: ativo ? 'Inativar' : 'Reativar',
+              icon: ativo ? AppIcons.block : AppIcons.circleCheck,
+              variant: AppButtonVariant.secondary,
+              loading: _processandoStatus,
+              onPressed: _removendo ? null : () => _alternarStatus(professor),
+            ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _removendo,
+              onPressed: _processandoStatus ? null : () => _excluir(professor),
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Dados pessoais',
@@ -277,13 +259,17 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
 }
 
 class _ProfessorPainelSkeleton extends StatelessWidget {
-  const _ProfessorPainelSkeleton();
+  const _ProfessorPainelSkeleton({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AppBackLink(label: 'Professores', onTap: onBack),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             const LoadingSkeleton(width: 80, height: 80, shape: AppSkeletonShape.circle),

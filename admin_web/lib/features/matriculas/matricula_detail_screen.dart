@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../../routing/back_navigation.dart';
+
 final _formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
 /// Painel de detalhe da matrícula — Módulo 2 (MS5), mesmo padrão
@@ -52,6 +54,10 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
     setState(() {
       _future = ref.read(matriculasApiProvider).get(widget.matriculaId);
     });
+  }
+
+  void _voltar([bool? alterado]) {
+    context.backToList('/matriculas', result: alterado ?? _alterado);
   }
 
   Future<void> _trancar() async {
@@ -180,7 +186,7 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
     try {
       await ref.read(matriculasApiProvider).remove(matricula.id);
       if (mounted) {
-        context.pop(true);
+        _voltar(true);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -196,7 +202,7 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.pop(_alterado);
+          _voltar();
         }
       },
       // Rota fora do ShellRoute (tela cheia) — precisa do próprio Scaffold,
@@ -210,14 +216,21 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _MatriculaPainelSkeleton();
+                  return _MatriculaPainelSkeleton(onBack: _voltar);
                 }
                 if (snapshot.hasError) {
-                  return EmptyState(
-                    icon: AppIcons.alert,
-                    title: 'Não foi possível carregar a matrícula.',
-                    actionLabel: 'Tentar novamente',
-                    onAction: _carregar,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppBackLink(label: 'Matrículas', onTap: _voltar),
+                      const SizedBox(height: AppSpacing.lg),
+                      EmptyState(
+                        icon: AppIcons.alert,
+                        title: 'Não foi possível carregar a matrícula.',
+                        actionLabel: 'Tentar novamente',
+                        onAction: _carregar,
+                      ),
+                    ],
                   );
                 }
                 return _painel(context, snapshot.data!);
@@ -244,118 +257,77 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
   };
 
   Widget _painel(BuildContext context, Matricula matricula) {
-    final colors = context.colors;
     final status = matricula.status;
     final bloqueado = _processando || _removendo;
-
-    // Bloco avatar+nome precisa de Expanded pro nome truncar em vez de
-    // estourar — mesmo padrão de bug já visto em AppButton/AppHeader/
-    // MetricCard/AlunoDetailScreen.
-    final info = Row(
-      children: [
-        AppAvatarPicker(imageUrl: matricula.alunoFotoUrl, radius: 40, enabled: false),
-        const SizedBox(width: AppSpacing.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                matricula.alunoNome,
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                matricula.planoNome,
-                style: AppTypography.bodyMedium.copyWith(color: colors.textMuted),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              AppBadge(_statusLabel(status), tone: _statusTone(status)),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    // Matriz de estados e transições — ver docs/16, seção "Matriz de
-    // estados e transições (MS5)". Cada ação só aparece quando o backend
-    // de fato aceita a transição pro status atual.
-    final acoes = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        AppButton(
-          label: 'Editar',
-          icon: AppIcons.edit,
-          onPressed: (status == MatriculaStatus.cancelada || status == MatriculaStatus.encerrada || bloqueado)
-              ? null
-              : () async {
-                  final resultado = await context.push<bool>('/matriculas/${matricula.id}/editar');
-                  if (resultado == true) {
-                    _alterado = true;
-                    _carregar();
-                  }
-                },
-        ),
-        if (status == MatriculaStatus.ativa)
-          AppButton(
-            label: 'Trancar',
-            icon: AppIcons.block,
-            variant: AppButtonVariant.secondary,
-            loading: _processando,
-            onPressed: _removendo ? null : _trancar,
-          ),
-        if (status == MatriculaStatus.trancada)
-          AppButton(
-            label: 'Reativar',
-            icon: AppIcons.circleCheck,
-            variant: AppButtonVariant.secondary,
-            loading: _processando,
-            onPressed: _removendo ? null : _reativar,
-          ),
-        if (status == MatriculaStatus.ativa)
-          AppButton(
-            label: 'Renovar',
-            icon: AppIcons.history,
-            variant: AppButtonVariant.secondary,
-            loading: _processando,
-            onPressed: _removendo ? null : _renovar,
-          ),
-        if (status == MatriculaStatus.ativa || status == MatriculaStatus.trancada)
-          AppButton(
-            label: 'Cancelar',
-            icon: AppIcons.circleX,
-            variant: AppButtonVariant.secondary,
-            loading: _processando,
-            onPressed: _removendo ? null : _cancelar,
-          ),
-        AppButton(
-          label: 'Remover',
-          icon: AppIcons.trash,
-          variant: AppButtonVariant.danger,
-          loading: _removendo,
-          onPressed: _processando ? null : () => _remover(matricula),
-        ),
-      ],
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (context.isMobile)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [info, const SizedBox(height: AppSpacing.lg), acoes],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: info), const SizedBox(width: AppSpacing.lg), acoes],
-          ),
+        AppDetailHeader(
+          listLabel: 'Matrículas',
+          onBack: _voltar,
+          leading: AppAvatarPicker(imageUrl: matricula.alunoFotoUrl, radius: 40, enabled: false),
+          title: matricula.alunoNome,
+          subtitle: matricula.planoNome,
+          trailing: AppBadge(_statusLabel(status), tone: _statusTone(status)),
+          // Matriz de estados e transições — ver docs/16, seção "Matriz de
+          // estados e transições (MS5)". Cada ação só aparece quando o
+          // backend de fato aceita a transição pro status atual.
+          actions: [
+            AppButton(
+              label: 'Editar',
+              icon: AppIcons.edit,
+              onPressed: (status == MatriculaStatus.cancelada || status == MatriculaStatus.encerrada || bloqueado)
+                  ? null
+                  : () async {
+                      final resultado = await context.push<bool>('/matriculas/${matricula.id}/editar');
+                      if (resultado == true) {
+                        _alterado = true;
+                        _carregar();
+                      }
+                    },
+            ),
+            if (status == MatriculaStatus.ativa)
+              AppButton(
+                label: 'Trancar',
+                icon: AppIcons.block,
+                variant: AppButtonVariant.secondary,
+                loading: _processando,
+                onPressed: _removendo ? null : _trancar,
+              ),
+            if (status == MatriculaStatus.trancada)
+              AppButton(
+                label: 'Reativar',
+                icon: AppIcons.circleCheck,
+                variant: AppButtonVariant.secondary,
+                loading: _processando,
+                onPressed: _removendo ? null : _reativar,
+              ),
+            if (status == MatriculaStatus.ativa)
+              AppButton(
+                label: 'Renovar',
+                icon: AppIcons.history,
+                variant: AppButtonVariant.secondary,
+                loading: _processando,
+                onPressed: _removendo ? null : _renovar,
+              ),
+            if (status == MatriculaStatus.ativa || status == MatriculaStatus.trancada)
+              AppButton(
+                label: 'Cancelar',
+                icon: AppIcons.circleX,
+                variant: AppButtonVariant.secondary,
+                loading: _processando,
+                onPressed: _removendo ? null : _cancelar,
+              ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _removendo,
+              onPressed: _processando ? null : () => _remover(matricula),
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Dados da matrícula',
@@ -423,13 +395,17 @@ class _MatriculaDetailScreenState extends ConsumerState<MatriculaDetailScreen> {
 }
 
 class _MatriculaPainelSkeleton extends StatelessWidget {
-  const _MatriculaPainelSkeleton();
+  const _MatriculaPainelSkeleton({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AppBackLink(label: 'Matrículas', onTap: onBack),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             const LoadingSkeleton(width: 80, height: 80, shape: AppSkeletonShape.circle),

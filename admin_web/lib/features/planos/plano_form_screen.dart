@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
+
+import '../../routing/back_navigation.dart';
 
 /// Formulário de plano (criar/editar) — Módulo 1 (MS4), mesmo padrão
 /// consolidado por `AlunoFormScreen`: seções em `AppCard`, campos em
@@ -42,6 +43,8 @@ class _PlanoFormScreenState extends ConsumerState<PlanoFormScreen> {
   String? _erroSalvar;
 
   bool get _editando => widget.planoId != null;
+
+  void _cancelar() => context.backToList('/planos', result: false);
 
   @override
   void initState() {
@@ -116,7 +119,7 @@ class _PlanoFormScreenState extends ConsumerState<PlanoFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_editando ? 'Plano atualizado com sucesso.' : 'Plano cadastrado com sucesso.')),
         );
-        context.pop(true);
+        context.backToList('/planos', result: true);
       }
     } on DioException catch (e) {
       setState(() => _erroSalvar = mensagemErroApi(e));
@@ -141,9 +144,10 @@ class _PlanoFormScreenState extends ConsumerState<PlanoFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _editando ? 'Editar plano' : 'Novo plano',
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
+              AppDetailHeader(
+                listLabel: 'Planos',
+                onBack: _cancelar,
+                title: _editando ? 'Editar plano' : 'Novo plano',
               ),
               const SizedBox(height: AppSpacing.xl),
               if (_erroCarregamento != null)
@@ -242,7 +246,7 @@ class _PlanoFormScreenState extends ConsumerState<PlanoFormScreen> {
           ],
           Row(
             children: [
-              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : () => context.pop(false)),
+              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : _cancelar),
               const SizedBox(width: AppSpacing.sm),
               AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
             ],

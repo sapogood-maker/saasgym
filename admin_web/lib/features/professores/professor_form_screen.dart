@@ -3,8 +3,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
+
+import '../../routing/back_navigation.dart';
 
 /// Formulário de professor (criar/editar) — Sprint 3, reescrita 1:1 do
 /// padrão consolidado por `AlunoFormScreen` (Sprint 2, MS4): seções em
@@ -41,6 +42,8 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
   String? _erroSalvar;
 
   bool get _editando => widget.professorId != null;
+
+  void _cancelar() => context.backToList('/professores', result: false);
 
   @override
   void initState() {
@@ -118,7 +121,7 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_editando ? 'Professor atualizado com sucesso.' : 'Professor cadastrado com sucesso.')),
         );
-        context.pop(true);
+        context.backToList('/professores', result: true);
       }
     } on DioException catch (e) {
       setState(() => _erroSalvar = mensagemErroApi(e));
@@ -143,9 +146,10 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _editando ? 'Editar professor' : 'Novo professor',
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
+              AppDetailHeader(
+                listLabel: 'Professores',
+                onBack: _cancelar,
+                title: _editando ? 'Editar professor' : 'Novo professor',
               ),
               const SizedBox(height: AppSpacing.xl),
               if (_erroCarregamento != null)
@@ -243,7 +247,7 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
           ],
           Row(
             children: [
-              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : () => context.pop(false)),
+              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : _cancelar),
               const SizedBox(width: AppSpacing.sm),
               AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
             ],

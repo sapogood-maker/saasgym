@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../../routing/back_navigation.dart';
+
 /// Painel de detalhe do aluno — referência de composição para todo painel
 /// de detalhe futuro (Professores, Turmas, ...): seções em `AppCard`,
 /// pares rótulo/valor via `AppDetailRow` dentro de `AppFormRow` (mesmo
@@ -36,6 +38,10 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
     setState(() {
       _future = ref.read(alunosApiProvider).get(widget.alunoId);
     });
+  }
+
+  void _voltar([bool? alterado]) {
+    context.backToList('/alunos', result: alterado ?? _alterado);
   }
 
   Future<void> _alternarStatus(Aluno aluno) async {
@@ -72,7 +78,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
     try {
       await ref.read(alunosApiProvider).remove(aluno.id);
       if (mounted) {
-        context.pop(true);
+        _voltar(true);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -90,7 +96,7 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.pop(_alterado);
+          _voltar();
         }
       },
       // Rota fora do ShellRoute (tela cheia) — precisa do próprio Scaffold,
@@ -104,14 +110,21 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _AlunoPainelSkeleton();
+                  return _AlunoPainelSkeleton(onBack: _voltar);
                 }
                 if (snapshot.hasError) {
-                  return EmptyState(
-                    icon: AppIcons.alert,
-                    title: 'Não foi possível carregar o aluno.',
-                    actionLabel: 'Tentar novamente',
-                    onAction: _carregar,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppBackLink(label: 'Alunos', onTap: _voltar),
+                      const SizedBox(height: AppSpacing.lg),
+                      EmptyState(
+                        icon: AppIcons.alert,
+                        title: 'Não foi possível carregar o aluno.',
+                        actionLabel: 'Tentar novamente',
+                        onAction: _carregar,
+                      ),
+                    ],
                   );
                 }
                 return _painel(context, snapshot.data!);
@@ -127,82 +140,48 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
     final colors = context.colors;
     final ativo = aluno.status == UserStatus.ativo;
 
-    // Bloco avatar+nome precisa de Expanded pro nome truncar em vez de
-    // estourar — Row sem isso overflow assim que o espaço fica estreito
-    // (mesmo padrão de bug já visto em AppButton/AppHeader/MetricCard).
-    final info = Row(
-      children: [
-        AppAvatarPicker(imageUrl: aluno.fotoUrl, radius: 40, enabled: false),
-        const SizedBox(width: AppSpacing.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                aluno.nome,
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              AppBadge(
-                ativo ? 'Ativo' : 'Inativo',
-                tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    final acoes = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        AppButton(
-          label: 'Editar',
-          icon: AppIcons.edit,
-          onPressed: (_processandoStatus || _removendo)
-              ? null
-              : () async {
-                  final resultado = await context.push<bool>('/alunos/${aluno.id}/editar');
-                  if (resultado == true) {
-                    _alterado = true;
-                    _carregar();
-                  }
-                },
-        ),
-        AppButton(
-          label: ativo ? 'Inativar' : 'Reativar',
-          icon: ativo ? AppIcons.block : AppIcons.circleCheck,
-          variant: AppButtonVariant.secondary,
-          loading: _processandoStatus,
-          onPressed: _removendo ? null : () => _alternarStatus(aluno),
-        ),
-        AppButton(
-          label: 'Remover',
-          icon: AppIcons.trash,
-          variant: AppButtonVariant.danger,
-          loading: _removendo,
-          onPressed: _processandoStatus ? null : () => _excluir(aluno),
-        ),
-      ],
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (context.isMobile)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [info, const SizedBox(height: AppSpacing.lg), acoes],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: info), const SizedBox(width: AppSpacing.lg), acoes],
+        AppDetailHeader(
+          listLabel: 'Alunos',
+          onBack: _voltar,
+          leading: AppAvatarPicker(imageUrl: aluno.fotoUrl, radius: 40, enabled: false),
+          title: aluno.nome,
+          trailing: AppBadge(
+            ativo ? 'Ativo' : 'Inativo',
+            tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
           ),
+          actions: [
+            AppButton(
+              label: 'Editar',
+              icon: AppIcons.edit,
+              onPressed: (_processandoStatus || _removendo)
+                  ? null
+                  : () async {
+                      final resultado = await context.push<bool>('/alunos/${aluno.id}/editar');
+                      if (resultado == true) {
+                        _alterado = true;
+                        _carregar();
+                      }
+                    },
+            ),
+            AppButton(
+              label: ativo ? 'Inativar' : 'Reativar',
+              icon: ativo ? AppIcons.block : AppIcons.circleCheck,
+              variant: AppButtonVariant.secondary,
+              loading: _processandoStatus,
+              onPressed: _removendo ? null : () => _alternarStatus(aluno),
+            ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _removendo,
+              onPressed: _processandoStatus ? null : () => _excluir(aluno),
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Dados pessoais',
@@ -326,13 +305,17 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
 }
 
 class _AlunoPainelSkeleton extends StatelessWidget {
-  const _AlunoPainelSkeleton();
+  const _AlunoPainelSkeleton({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        AppBackLink(label: 'Alunos', onTap: onBack),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             const LoadingSkeleton(width: 80, height: 80, shape: AppSkeletonShape.circle),

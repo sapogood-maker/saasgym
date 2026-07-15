@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../../routing/back_navigation.dart';
+
 final _formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
 /// Painel de detalhe do plano — Módulo 1 (MS5), mesmo padrão consolidado
@@ -43,6 +45,10 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
     });
   }
 
+  void _voltar([bool? alterado]) {
+    context.backToList('/planos', result: alterado ?? _alterado);
+  }
+
   Future<void> _alternarStatus(Plano plano) async {
     setState(() => _processandoStatus = true);
     try {
@@ -77,7 +83,7 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
     try {
       await ref.read(planosApiProvider).remove(plano.id);
       if (mounted) {
-        context.pop(true);
+        _voltar(true);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -95,7 +101,7 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.pop(_alterado);
+          _voltar();
         }
       },
       // Rota fora do ShellRoute (tela cheia) — precisa do próprio Scaffold,
@@ -109,14 +115,21 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _PlanoPainelSkeleton();
+                  return _PlanoPainelSkeleton(onBack: _voltar);
                 }
                 if (snapshot.hasError) {
-                  return EmptyState(
-                    icon: AppIcons.alert,
-                    title: 'Não foi possível carregar o plano.',
-                    actionLabel: 'Tentar novamente',
-                    onAction: _carregar,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppBackLink(label: 'Planos', onTap: _voltar),
+                      const SizedBox(height: AppSpacing.lg),
+                      EmptyState(
+                        icon: AppIcons.alert,
+                        title: 'Não foi possível carregar o plano.',
+                        actionLabel: 'Tentar novamente',
+                        onAction: _carregar,
+                      ),
+                    ],
                   );
                 }
                 return _painel(context, snapshot.data!);
@@ -132,76 +145,47 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
     final colors = context.colors;
     final ativo = plano.status == UserStatus.ativo;
 
-    // `info` fica sem Expanded aqui — só é envolvido no ponto de uso do
-    // Row desktop (constraints largas). No Column mobile (dentro de um
-    // SingleChildScrollView, altura irrestrita) o Expanded quebraria o
-    // layout — mesmo padrão de bug já visto em AppButton/AppHeader/
-    // MetricCard/AppPagination, agora na direção inversa.
-    final info = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          plano.nome,
-          style: AppTypography.displayLarge.copyWith(color: colors.text),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        AppBadge(
-          ativo ? 'Ativo' : 'Inativo',
-          tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
-        ),
-      ],
-    );
-
-    final acoes = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        AppButton(
-          label: 'Editar',
-          icon: AppIcons.edit,
-          onPressed: (_processandoStatus || _removendo)
-              ? null
-              : () async {
-                  final resultado = await context.push<bool>('/planos/${plano.id}/editar');
-                  if (resultado == true) {
-                    _alterado = true;
-                    _carregar();
-                  }
-                },
-        ),
-        AppButton(
-          label: ativo ? 'Inativar' : 'Reativar',
-          icon: ativo ? AppIcons.block : AppIcons.circleCheck,
-          variant: AppButtonVariant.secondary,
-          loading: _processandoStatus,
-          onPressed: _removendo ? null : () => _alternarStatus(plano),
-        ),
-        AppButton(
-          label: 'Remover',
-          icon: AppIcons.trash,
-          variant: AppButtonVariant.danger,
-          loading: _removendo,
-          onPressed: _processandoStatus ? null : () => _excluir(plano),
-        ),
-      ],
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (context.isMobile)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [info, const SizedBox(height: AppSpacing.lg), acoes],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: info), const SizedBox(width: AppSpacing.lg), acoes],
+        AppDetailHeader(
+          listLabel: 'Planos',
+          onBack: _voltar,
+          title: plano.nome,
+          trailing: AppBadge(
+            ativo ? 'Ativo' : 'Inativo',
+            tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
           ),
+          actions: [
+            AppButton(
+              label: 'Editar',
+              icon: AppIcons.edit,
+              onPressed: (_processandoStatus || _removendo)
+                  ? null
+                  : () async {
+                      final resultado = await context.push<bool>('/planos/${plano.id}/editar');
+                      if (resultado == true) {
+                        _alterado = true;
+                        _carregar();
+                      }
+                    },
+            ),
+            AppButton(
+              label: ativo ? 'Inativar' : 'Reativar',
+              icon: ativo ? AppIcons.block : AppIcons.circleCheck,
+              variant: AppButtonVariant.secondary,
+              loading: _processandoStatus,
+              onPressed: _removendo ? null : () => _alternarStatus(plano),
+            ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _removendo,
+              onPressed: _processandoStatus ? null : () => _excluir(plano),
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Dados do plano',
@@ -265,20 +249,24 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
 }
 
 class _PlanoPainelSkeleton extends StatelessWidget {
-  const _PlanoPainelSkeleton();
+  const _PlanoPainelSkeleton({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LoadingSkeleton(width: 220, height: 28),
-        SizedBox(height: AppSpacing.sm),
-        LoadingSkeleton(width: 90, height: 20),
-        SizedBox(height: AppSpacing.xl),
-        AppCard(title: 'Dados do plano', loading: true),
-        SizedBox(height: AppSpacing.lg),
-        AppCard(title: 'Detalhes', loading: true),
+        AppBackLink(label: 'Planos', onTap: onBack),
+        const SizedBox(height: AppSpacing.lg),
+        const LoadingSkeleton(width: 220, height: 28),
+        const SizedBox(height: AppSpacing.sm),
+        const LoadingSkeleton(width: 90, height: 20),
+        const SizedBox(height: AppSpacing.xl),
+        const AppCard(title: 'Dados do plano', loading: true),
+        const SizedBox(height: AppSpacing.lg),
+        const AppCard(title: 'Detalhes', loading: true),
       ],
     );
   }

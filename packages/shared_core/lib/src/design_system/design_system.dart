@@ -30,6 +30,7 @@ export 'widgets/layout/app_form_row.dart';
 export 'widgets/navigation/app_pagination.dart';
 export 'widgets/overlays/app_confirm_dialog.dart';
 export 'widgets/navigation/app_breadcrumb.dart';
+export 'widgets/navigation/app_detail_header.dart';
 export 'widgets/navigation/app_header.dart';
 export 'widgets/navigation/app_sidebar.dart';
 export 'widgets/surfaces/app_card.dart';

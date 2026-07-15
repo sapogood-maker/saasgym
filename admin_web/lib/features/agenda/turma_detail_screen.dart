@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../../routing/back_navigation.dart';
 
 const _nomesDiaSemana = [
   'Domingo',
@@ -52,6 +53,10 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
     });
   }
 
+  void _voltar([bool? alterado]) {
+    context.backToList('/agenda/turmas', result: alterado ?? _alterado);
+  }
+
   Future<void> _alternarStatus(Turma turma) async {
     setState(() => _processandoStatus = true);
     try {
@@ -86,7 +91,7 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
     try {
       await ref.read(turmasApiProvider).remove(turma.id);
       if (mounted) {
-        context.pop(true);
+        _voltar(true);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -104,7 +109,7 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          context.pop(_alterado);
+          _voltar();
         }
       },
       // Rota fora do ShellRoute (tela cheia) — precisa do próprio Scaffold,
@@ -118,14 +123,21 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const _TurmaPainelSkeleton();
+                  return _TurmaPainelSkeleton(onBack: _voltar);
                 }
                 if (snapshot.hasError) {
-                  return EmptyState(
-                    icon: AppIcons.alert,
-                    title: 'Não foi possível carregar a turma.',
-                    actionLabel: 'Tentar novamente',
-                    onAction: _carregar,
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppBackLink(label: 'Turmas', onTap: _voltar),
+                      const SizedBox(height: AppSpacing.lg),
+                      EmptyState(
+                        icon: AppIcons.alert,
+                        title: 'Não foi possível carregar a turma.',
+                        actionLabel: 'Tentar novamente',
+                        onAction: _carregar,
+                      ),
+                    ],
                   );
                 }
                 return _painel(context, snapshot.data!);
@@ -138,74 +150,49 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
   }
 
   Widget _painel(BuildContext context, Turma turma) {
-    final colors = context.colors;
     final ativo = turma.status == UserStatus.ativo;
-
-    final info = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          turma.nome,
-          style: AppTypography.displayLarge.copyWith(color: colors.text),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        AppBadge(
-          ativo ? 'Ativa' : 'Inativa',
-          tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
-        ),
-      ],
-    );
-
-    final acoes = Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        AppButton(
-          label: 'Editar',
-          icon: AppIcons.edit,
-          onPressed: (_processandoStatus || _removendo)
-              ? null
-              : () async {
-                  final resultado = await context.push<bool>('/agenda/turmas/${turma.id}/editar');
-                  if (resultado == true) {
-                    _alterado = true;
-                    _carregar();
-                  }
-                },
-        ),
-        AppButton(
-          label: ativo ? 'Inativar' : 'Reativar',
-          icon: ativo ? AppIcons.block : AppIcons.circleCheck,
-          variant: AppButtonVariant.secondary,
-          loading: _processandoStatus,
-          onPressed: _removendo ? null : () => _alternarStatus(turma),
-        ),
-        AppButton(
-          label: 'Remover',
-          icon: AppIcons.trash,
-          variant: AppButtonVariant.danger,
-          loading: _removendo,
-          onPressed: _processandoStatus ? null : () => _excluir(turma),
-        ),
-      ],
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (context.isMobile)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [info, const SizedBox(height: AppSpacing.lg), acoes],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: info), const SizedBox(width: AppSpacing.lg), acoes],
+        AppDetailHeader(
+          listLabel: 'Turmas',
+          onBack: _voltar,
+          title: turma.nome,
+          trailing: AppBadge(
+            ativo ? 'Ativa' : 'Inativa',
+            tone: ativo ? AppBadgeTone.success : AppBadgeTone.neutral,
           ),
+          actions: [
+            AppButton(
+              label: 'Editar',
+              icon: AppIcons.edit,
+              onPressed: (_processandoStatus || _removendo)
+                  ? null
+                  : () async {
+                      final resultado = await context.push<bool>('/agenda/turmas/${turma.id}/editar');
+                      if (resultado == true) {
+                        _alterado = true;
+                        _carregar();
+                      }
+                    },
+            ),
+            AppButton(
+              label: ativo ? 'Inativar' : 'Reativar',
+              icon: ativo ? AppIcons.block : AppIcons.circleCheck,
+              variant: AppButtonVariant.secondary,
+              loading: _processandoStatus,
+              onPressed: _removendo ? null : () => _alternarStatus(turma),
+            ),
+            AppButton(
+              label: 'Remover',
+              icon: AppIcons.trash,
+              variant: AppButtonVariant.danger,
+              loading: _removendo,
+              onPressed: _processandoStatus ? null : () => _excluir(turma),
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.xl),
         AppCard(
           title: 'Dados da turma',
@@ -245,20 +232,24 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
 }
 
 class _TurmaPainelSkeleton extends StatelessWidget {
-  const _TurmaPainelSkeleton();
+  const _TurmaPainelSkeleton({required this.onBack});
+
+  final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LoadingSkeleton(width: 220, height: 28),
-        SizedBox(height: AppSpacing.sm),
-        LoadingSkeleton(width: 90, height: 20),
-        SizedBox(height: AppSpacing.xl),
-        AppCard(title: 'Dados da turma', loading: true),
-        SizedBox(height: AppSpacing.lg),
-        AppCard(title: 'Detalhes', loading: true),
+        AppBackLink(label: 'Turmas', onTap: onBack),
+        const SizedBox(height: AppSpacing.lg),
+        const LoadingSkeleton(width: 220, height: 28),
+        const SizedBox(height: AppSpacing.sm),
+        const LoadingSkeleton(width: 90, height: 20),
+        const SizedBox(height: AppSpacing.xl),
+        const AppCard(title: 'Dados da turma', loading: true),
+        const SizedBox(height: AppSpacing.lg),
+        const AppCard(title: 'Detalhes', loading: true),
       ],
     );
   }

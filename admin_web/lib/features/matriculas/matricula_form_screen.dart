@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
+
+import '../../routing/back_navigation.dart';
 
 /// Formulário de matrícula (criar/editar) — Módulo 2 (MS4), mesmo padrão
 /// consolidado por `AlunoFormScreen`/`PlanoFormScreen`: seções em `AppCard`,
@@ -57,6 +58,8 @@ class _MatriculaFormScreenState extends ConsumerState<MatriculaFormScreen> {
   String? _erroSalvar;
 
   bool get _editando => widget.matriculaId != null;
+
+  void _cancelar() => context.backToList('/matriculas', result: false);
 
   @override
   void initState() {
@@ -183,7 +186,7 @@ class _MatriculaFormScreenState extends ConsumerState<MatriculaFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_editando ? 'Matrícula atualizada com sucesso.' : 'Matrícula cadastrada com sucesso.')),
         );
-        context.pop(true);
+        context.backToList('/matriculas', result: true);
       }
     } on DioException catch (e) {
       setState(() => _erroSalvar = mensagemErroApi(e));
@@ -208,9 +211,10 @@ class _MatriculaFormScreenState extends ConsumerState<MatriculaFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _editando ? 'Editar matrícula' : 'Nova matrícula',
-                style: AppTypography.displayLarge.copyWith(color: colors.text),
+              AppDetailHeader(
+                listLabel: 'Matrículas',
+                onBack: _cancelar,
+                title: _editando ? 'Editar matrícula' : 'Nova matrícula',
               ),
               const SizedBox(height: AppSpacing.xl),
               if (_erroCarregamento != null)
@@ -333,7 +337,7 @@ class _MatriculaFormScreenState extends ConsumerState<MatriculaFormScreen> {
           ],
           Row(
             children: [
-              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : () => context.pop(false)),
+              AppButton(label: 'Cancelar', variant: AppButtonVariant.secondary, onPressed: _salvando ? null : _cancelar),
               const SizedBox(width: AppSpacing.sm),
               AppButton(label: 'Salvar', loading: _salvando, onPressed: _salvar),
             ],

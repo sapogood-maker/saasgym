@@ -101,7 +101,7 @@ class DesignSystemGalleryScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xxl),
               const _Section(
                 title: 'Navigation',
-                description: 'AppBreadcrumb, AppHeader, AppSidebar e AppPagination (paginação server-side: page/total/pageSize).',
+                description: 'AppBreadcrumb, AppDetailHeader, AppHeader, AppSidebar e AppPagination (paginação server-side: page/total/pageSize).',
                 child: _NavigationShowcase(),
               ),
               const SizedBox(height: AppSpacing.xxl),
@@ -679,6 +679,29 @@ class _NavigationShowcase extends StatelessWidget {
         const AppBreadcrumb(['Dashboard']),
         const SizedBox(height: AppSpacing.xs),
         const AppBreadcrumb(['Alunos', 'Mariana Ferreira']),
+        const SizedBox(height: AppSpacing.xl),
+        Text('AppDetailHeader', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppSpacing.sm),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surface,
+            border: Border.all(color: colors.border),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: AppDetailHeader(
+              listLabel: 'Alunos',
+              onBack: () {},
+              title: 'Mariana Ferreira',
+              trailing: const AppBadge('Ativo', tone: AppBadgeTone.success),
+              actions: [
+                AppButton(label: 'Editar', icon: AppIcons.edit, onPressed: () {}),
+                AppButton(label: 'Remover', icon: AppIcons.trash, variant: AppButtonVariant.danger, onPressed: () {}),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: AppSpacing.xl),
         Text('AppHeader', style: AppTypography.labelSmall.copyWith(color: colors.textFaint)),
         const SizedBox(height: AppSpacing.sm),
