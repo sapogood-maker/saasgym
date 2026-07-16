@@ -39,6 +39,7 @@ class AppShell extends ConsumerWidget {
     AppSidebarDestination(label: 'Turmas', icon: AppIcons.turmas, path: '/agenda/turmas', section: 'Operação'),
     AppSidebarDestination(label: 'Calendário', icon: AppIcons.calendar, path: '/agenda/calendario', section: 'Operação'),
     AppSidebarDestination(label: 'Reposições', icon: AppIcons.reposicao, path: '/agenda/reposicoes', section: 'Operação'),
+    AppSidebarDestination(label: 'Relatórios', icon: AppIcons.reports, path: '/relatorios', section: 'Operação'),
     AppSidebarDestination(label: 'Meu perfil', icon: AppIcons.profile, path: '/perfil', section: 'Conta'),
   ];
 

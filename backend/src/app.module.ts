@@ -15,6 +15,7 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { AgendaModule } from './modules/agenda/agenda.module';
 import { AvaliacoesFisicasModule } from './modules/avaliacoes-fisicas/avaliacoes-fisicas.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { RelatoriosModule } from './modules/relatorios/relatorios.module';
 import { UsersModule } from './modules/users/users.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TenantContextModule } from './common/context/tenant-context.module';
@@ -44,6 +45,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AgendaModule,
     AvaliacoesFisicasModule,
     DashboardModule,
+    RelatoriosModule,
     UsersModule,
     NotificationsModule,
   ],

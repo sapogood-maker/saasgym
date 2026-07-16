@@ -21,6 +21,7 @@ import '../matriculas/matriculas_api.dart';
 import '../notifications/notificacoes_api.dart';
 import '../planos/planos_api.dart';
 import '../professores/professores_api.dart';
+import '../relatorios/relatorios_api.dart';
 import '../users/users_api.dart';
 
 /// URL base da API — configurável via `--dart-define=API_BASE_URL=...`
@@ -91,6 +92,10 @@ final lancamentosApiProvider = Provider<LancamentosApi>(
 
 final dashboardFinanceiroApiProvider = Provider<DashboardFinanceiroApi>(
   (ref) => DashboardFinanceiroApi(ref.watch(apiClientProvider).dio),
+);
+
+final relatoriosApiProvider = Provider<RelatoriosApi>(
+  (ref) => RelatoriosApi(ref.watch(apiClientProvider).dio),
 );
 
 final modalidadesApiProvider = Provider<ModalidadesApi>(

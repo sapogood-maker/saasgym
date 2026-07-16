@@ -49,4 +49,5 @@ abstract final class AppIcons {
   static const IconData turmas = LucideIcons.layoutGrid;
   static const IconData modalidade = LucideIcons.tag;
   static const IconData reposicao = LucideIcons.repeat;
+  static const IconData reports = LucideIcons.barChart3;
 }

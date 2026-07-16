@@ -28,6 +28,7 @@ import '../features/planos/planos_screen.dart';
 import '../features/professores/professor_detail_screen.dart';
 import '../features/professores/professor_form_screen.dart';
 import '../features/professores/professores_screen.dart';
+import '../features/relatorios/relatorios_screen.dart';
 import '../features/shell/app_shell.dart';
 
 /// Ponte entre o `authSessionProvider` (Riverpod) e o `refreshListenable`
@@ -127,6 +128,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/agenda/reposicoes',
             builder: (context, state) => const ReposicoesScreen(),
+          ),
+          GoRoute(
+            path: '/relatorios',
+            builder: (context, state) => const RelatoriosScreen(),
           ),
           GoRoute(
             path: '/perfil',
