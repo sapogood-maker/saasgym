@@ -50,4 +50,7 @@ abstract final class AppIcons {
   static const IconData modalidade = LucideIcons.tag;
   static const IconData reposicao = LucideIcons.repeat;
   static const IconData reports = LucideIcons.barChart3;
+  static const IconData location = LucideIcons.mapPin;
+  static const IconData tip = LucideIcons.lightbulb;
+  static const IconData clock = LucideIcons.clock;
 }
