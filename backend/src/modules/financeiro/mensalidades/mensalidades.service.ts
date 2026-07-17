@@ -47,10 +47,21 @@ export class MensalidadesService {
     private readonly tenantContext: TenantContextService,
   ) {}
 
-  /// Idempotente: rodar duas vezes pro mesmo mês/ano não duplica — pula
-  /// qualquer Matricula que já tenha Mensalidade gerada pro período. Só
-  /// considera Matriculas ATIVAS cuja vigência (dataInicio..dataFim) cobre
-  /// o mês alvo (evita gerar cobrança pra um contrato já vencido que
+  /// Idempotente: rodar duas vezes pro mesmo mês/ano não duplica — a
+  /// própria constraint `@@unique([matriculaId, dataVencimento])` do banco
+  /// é quem decide "já existe" (P2002 = pula), nunca uma checagem de
+  /// aplicação. Antes disso havia um `findFirst` prévio filtrando
+  /// `deletedAt: null`, que ignorava mensalidades removidas por engano
+  /// (`remove()`) e não era atômico com o `create` — as duas causas reais
+  /// da duplicidade em produção corrigida na migration
+  /// 20260717150000_consolida_mensalidades_duplicadas_indice_completo (ver
+  /// docs/31). Confiar só na constraint elimina ambas de uma vez: soft-delete
+  /// não libera a chave (mesma regra de negócio do índice completo) e dois
+  /// `create` concorrentes pro mesmo par nunca coexistem, porque o Postgres
+  /// serializa o conflito — só um vence, o outro recebe P2002.
+  ///
+  /// Só considera Matriculas ATIVAS cuja vigência (dataInicio..dataFim)
+  /// cobre o mês alvo (evita gerar cobrança pra um contrato já vencido que
   /// continua "ATIVA" no banco só por falta de renovação/scheduler).
   async gerar(
     dto: GerarMensalidadesDto,
@@ -78,29 +89,25 @@ export class MensalidadesService {
     let totalPuladas = 0;
 
     for (const matricula of matriculas) {
-      const jaExiste = await this.prisma.forTenant().mensalidade.findFirst({
-        where: {
-          matriculaId: matricula.id,
-          dataVencimento: { gte: inicio, lt: fim },
-          deletedAt: null,
-        },
-      });
-      if (jaExiste) {
-        totalPuladas++;
-        continue;
+      try {
+        const mensalidade = await this.prisma.forTenant().mensalidade.create({
+          data: {
+            matriculaId: matricula.id,
+            alunoId: matricula.alunoId,
+            valor: matricula.valor,
+            dataVencimento: dataVencimentoNoMes(mes, ano, matricula.diaVencimento),
+            createdByUserId: userId,
+          } as Prisma.MensalidadeUncheckedCreateInput,
+          include: mensalidadeInclude,
+        });
+        criadas.push(mensalidade);
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          totalPuladas++;
+          continue;
+        }
+        throw e;
       }
-
-      const mensalidade = await this.prisma.forTenant().mensalidade.create({
-        data: {
-          matriculaId: matricula.id,
-          alunoId: matricula.alunoId,
-          valor: matricula.valor,
-          dataVencimento: dataVencimentoNoMes(mes, ano, matricula.diaVencimento),
-          createdByUserId: userId,
-        } as Prisma.MensalidadeUncheckedCreateInput,
-        include: mensalidadeInclude,
-      });
-      criadas.push(mensalidade);
     }
 
     await this.auditService.record({
