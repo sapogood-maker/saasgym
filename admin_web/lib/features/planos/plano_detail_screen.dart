@@ -224,15 +224,7 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          title: 'Alunos matriculados',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.enrollment,
-            title: 'Alunos com este plano',
-            description: 'Quem está matriculado, desde quando e até quando.',
-            sprintTag: 'MÓDULO 2 · MATRÍCULAS',
-          ),
-        ),
+        _AlunosMatriculadosSection(planoId: plano.id),
         const SizedBox(height: AppSpacing.lg),
         AppCard(
           title: 'Financeiro',
@@ -282,6 +274,154 @@ String _periodicidadeLabel(Periodicidade periodicidade) {
       return 'Semestral';
     case Periodicidade.anual:
       return 'Anual';
+  }
+}
+
+String _matriculaStatusLabel(MatriculaStatus status) => switch (status) {
+  MatriculaStatus.ativa => 'Ativa',
+  MatriculaStatus.trancada => 'Trancada',
+  MatriculaStatus.cancelada => 'Cancelada',
+  MatriculaStatus.encerrada => 'Encerrada',
+};
+
+AppBadgeTone _matriculaStatusTone(MatriculaStatus status) => switch (status) {
+  MatriculaStatus.ativa => AppBadgeTone.success,
+  MatriculaStatus.trancada => AppBadgeTone.warning,
+  MatriculaStatus.cancelada => AppBadgeTone.error,
+  MatriculaStatus.encerrada => AppBadgeTone.neutral,
+};
+
+/// Seção "Alunos matriculados" do Detalhe do Plano — só leitura, mesmo
+/// motivo/padrão de `_MatriculasSection` (AlunoDetailScreen): trancar/
+/// cancelar/renovar continuam exclusivos da tela de Matrículas. Consome
+/// `MatriculasApi.listMatriculas(planoId: ...)`, já existente desde o
+/// Módulo 2 — nenhum endpoint novo.
+class _AlunosMatriculadosSection extends ConsumerStatefulWidget {
+  const _AlunosMatriculadosSection({required this.planoId});
+
+  final String planoId;
+
+  @override
+  ConsumerState<_AlunosMatriculadosSection> createState() => _AlunosMatriculadosSectionState();
+}
+
+class _AlunosMatriculadosSectionState extends ConsumerState<_AlunosMatriculadosSection> {
+  Future<PaginatedResult<Matricula>>? _future;
+  int _pagina = 1;
+  static const _tamanhoPagina = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  void _carregar() {
+    setState(() {
+      _future = ref
+          .read(matriculasApiProvider)
+          .listMatriculas(planoId: widget.planoId, page: _pagina, pageSize: _tamanhoPagina);
+    });
+  }
+
+  void _irParaPagina(int pagina) {
+    setState(() => _pagina = pagina);
+    _carregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      title: 'Alunos matriculados',
+      child: FutureBuilder<PaginatedResult<Matricula>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LoadingSkeleton(width: double.infinity, height: 16),
+                SizedBox(height: AppSpacing.sm),
+                LoadingSkeleton(width: double.infinity, height: 16),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: AppIcons.alert,
+              title: 'Não foi possível carregar os alunos matriculados.',
+              actionLabel: 'Tentar novamente',
+              onAction: _carregar,
+            );
+          }
+          final resultado = snapshot.data!;
+          if (resultado.items.isEmpty) {
+            return const EmptyState(
+              icon: AppIcons.enrollment,
+              title: 'Nenhum aluno matriculado.',
+            );
+          }
+          final colors = context.colors;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < resultado.items.length; i++) ...[
+                if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                _AlunoMatriculadoRow(matricula: resultado.items[i]),
+              ],
+              if (resultado.total > _tamanhoPagina) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AppPagination(
+                  page: resultado.page,
+                  pageSize: resultado.pageSize,
+                  total: resultado.total,
+                  onPageChanged: _irParaPagina,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AlunoMatriculadoRow extends StatelessWidget {
+  const _AlunoMatriculadoRow({required this.matricula});
+
+  final Matricula matricula;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
+      child: Row(
+        children: [
+          AppAvatarPicker(imageUrl: matricula.alunoFotoUrl, radius: 16, enabled: false),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(matricula.alunoNome, style: AppTypography.titleMedium.copyWith(color: colors.text)),
+                Text(
+                  'Desde ${dataCurtaFormat.format(matricula.dataInicio)}',
+                  style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          AppBadge(
+            _matriculaStatusLabel(matricula.status),
+            tone: _matriculaStatusTone(matricula.status),
+          ),
+        ],
+      ),
+    );
   }
 }
 

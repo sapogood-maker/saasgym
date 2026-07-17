@@ -238,37 +238,13 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          title: 'Matrículas',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.enrollment,
-            title: 'Plano e matrícula do aluno',
-            description: 'Vínculo com plano, data de início e vencimento.',
-            sprintTag: 'MÓDULO 2 · MATRÍCULAS',
-          ),
-        ),
+        _MatriculasSection(alunoId: aluno.id),
         const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          title: 'Financeiro',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.finance,
-            title: 'Mensalidades e pagamentos',
-            description: 'Histórico de cobranças, recebimentos e inadimplência.',
-            sprintTag: 'MÓDULO 3 · FINANCEIRO',
-          ),
-        ),
+        _MensalidadesSection(alunoId: aluno.id),
         const SizedBox(height: AppSpacing.lg),
         _AvaliacoesFisicasSection(alunoId: aluno.id),
         const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          title: 'Frequência',
-          child: const EmptyState.comingSoon(
-            icon: AppIcons.attendance,
-            title: 'Presença em aulas',
-            description: 'Check-ins e frequência em aulas e treinos.',
-            sprintTag: 'MÓDULO 4 · MS8',
-          ),
-        ),
+        _FrequenciaSection(alunoId: aluno.id),
         const SizedBox(height: AppSpacing.lg),
         AppCard(
           title: 'Treinos',
@@ -347,6 +323,460 @@ String _sexoLabel(Sexo sexo) {
       return 'Feminino';
     case Sexo.outro:
       return 'Outro';
+  }
+}
+
+String _matriculaStatusLabel(MatriculaStatus status) => switch (status) {
+  MatriculaStatus.ativa => 'Ativa',
+  MatriculaStatus.trancada => 'Trancada',
+  MatriculaStatus.cancelada => 'Cancelada',
+  MatriculaStatus.encerrada => 'Encerrada',
+};
+
+AppBadgeTone _matriculaStatusTone(MatriculaStatus status) => switch (status) {
+  MatriculaStatus.ativa => AppBadgeTone.success,
+  MatriculaStatus.trancada => AppBadgeTone.warning,
+  MatriculaStatus.cancelada => AppBadgeTone.error,
+  MatriculaStatus.encerrada => AppBadgeTone.neutral,
+};
+
+/// Seção "Matrículas" do Detalhe do Aluno — só leitura (criar/trancar/
+/// cancelar/renovar continuam exclusivos da tela de Matrículas, mesmo
+/// motivo de `_AvaliacoesFisicasSection` não editar). Consome
+/// `MatriculasApi.listMatriculas(alunoId: ...)`, já existente desde o
+/// Módulo 2 — nenhum endpoint novo.
+class _MatriculasSection extends ConsumerStatefulWidget {
+  const _MatriculasSection({required this.alunoId});
+
+  final String alunoId;
+
+  @override
+  ConsumerState<_MatriculasSection> createState() => _MatriculasSectionState();
+}
+
+class _MatriculasSectionState extends ConsumerState<_MatriculasSection> {
+  Future<PaginatedResult<Matricula>>? _future;
+  int _pagina = 1;
+  static const _tamanhoPagina = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  void _carregar() {
+    setState(() {
+      _future = ref
+          .read(matriculasApiProvider)
+          .listMatriculas(alunoId: widget.alunoId, page: _pagina, pageSize: _tamanhoPagina);
+    });
+  }
+
+  void _irParaPagina(int pagina) {
+    setState(() => _pagina = pagina);
+    _carregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      title: 'Matrículas',
+      child: FutureBuilder<PaginatedResult<Matricula>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LoadingSkeleton(width: double.infinity, height: 16),
+                SizedBox(height: AppSpacing.sm),
+                LoadingSkeleton(width: double.infinity, height: 16),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: AppIcons.alert,
+              title: 'Não foi possível carregar as matrículas.',
+              actionLabel: 'Tentar novamente',
+              onAction: _carregar,
+            );
+          }
+          final resultado = snapshot.data!;
+          if (resultado.items.isEmpty) {
+            return const EmptyState(
+              icon: AppIcons.enrollment,
+              title: 'Nenhuma matrícula encontrada.',
+            );
+          }
+          final colors = context.colors;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < resultado.items.length; i++) ...[
+                if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                _MatriculaRow(matricula: resultado.items[i]),
+              ],
+              if (resultado.total > _tamanhoPagina) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AppPagination(
+                  page: resultado.page,
+                  pageSize: resultado.pageSize,
+                  total: resultado.total,
+                  onPageChanged: _irParaPagina,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MatriculaRow extends StatelessWidget {
+  const _MatriculaRow({required this.matricula});
+
+  final Matricula matricula;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(AppIcons.enrollment, size: 16, color: colors.textFaint),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(matricula.planoNome, style: AppTypography.titleMedium.copyWith(color: colors.text)),
+                Text(
+                  '${dataCurtaFormat.format(matricula.dataInicio)} — '
+                  '${dataCurtaFormat.format(matricula.dataFim)}',
+                  style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          AppBadge(
+            _matriculaStatusLabel(matricula.status),
+            tone: _matriculaStatusTone(matricula.status),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _mensalidadeStatusLabel(Mensalidade mensalidade) {
+  if (mensalidade.status == MensalidadeStatus.pendente && mensalidade.atrasada) {
+    return 'Atrasada';
+  }
+  return switch (mensalidade.status) {
+    MensalidadeStatus.pendente => 'Pendente',
+    MensalidadeStatus.paga => 'Paga',
+    MensalidadeStatus.cancelada => 'Cancelada',
+  };
+}
+
+AppBadgeTone _mensalidadeStatusTone(Mensalidade mensalidade) {
+  if (mensalidade.status == MensalidadeStatus.pendente && mensalidade.atrasada) {
+    return AppBadgeTone.error;
+  }
+  return switch (mensalidade.status) {
+    MensalidadeStatus.pendente => AppBadgeTone.warning,
+    MensalidadeStatus.paga => AppBadgeTone.success,
+    MensalidadeStatus.cancelada => AppBadgeTone.neutral,
+  };
+}
+
+/// Seção "Financeiro" do Detalhe do Aluno — deliberadamente sem valor
+/// monetário nenhum (nem `valor`, nem `valorFinal`): é um resumo de
+/// situação (em dia, atrasada, paga), não um extrato — quem precisa do
+/// valor vai à tela de Mensalidades. Consome
+/// `MensalidadesApi.listMensalidades(alunoId: ...)`, já existente desde o
+/// Módulo 3 — nenhum endpoint novo.
+class _MensalidadesSection extends ConsumerStatefulWidget {
+  const _MensalidadesSection({required this.alunoId});
+
+  final String alunoId;
+
+  @override
+  ConsumerState<_MensalidadesSection> createState() => _MensalidadesSectionState();
+}
+
+class _MensalidadesSectionState extends ConsumerState<_MensalidadesSection> {
+  Future<PaginatedResult<Mensalidade>>? _future;
+  int _pagina = 1;
+  static const _tamanhoPagina = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  void _carregar() {
+    setState(() {
+      _future = ref
+          .read(mensalidadesApiProvider)
+          .listMensalidades(alunoId: widget.alunoId, page: _pagina, pageSize: _tamanhoPagina);
+    });
+  }
+
+  void _irParaPagina(int pagina) {
+    setState(() => _pagina = pagina);
+    _carregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      title: 'Financeiro',
+      child: FutureBuilder<PaginatedResult<Mensalidade>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LoadingSkeleton(width: double.infinity, height: 16),
+                SizedBox(height: AppSpacing.sm),
+                LoadingSkeleton(width: double.infinity, height: 16),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: AppIcons.alert,
+              title: 'Não foi possível carregar as mensalidades.',
+              actionLabel: 'Tentar novamente',
+              onAction: _carregar,
+            );
+          }
+          final resultado = snapshot.data!;
+          if (resultado.items.isEmpty) {
+            return const EmptyState(
+              icon: AppIcons.finance,
+              title: 'Nenhuma mensalidade encontrada.',
+            );
+          }
+          final colors = context.colors;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < resultado.items.length; i++) ...[
+                if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                _MensalidadeRow(mensalidade: resultado.items[i]),
+              ],
+              if (resultado.total > _tamanhoPagina) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AppPagination(
+                  page: resultado.page,
+                  pageSize: resultado.pageSize,
+                  total: resultado.total,
+                  onPageChanged: _irParaPagina,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MensalidadeRow extends StatelessWidget {
+  const _MensalidadeRow({required this.mensalidade});
+
+  final Mensalidade mensalidade;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final subtitulo = mensalidade.dataPagamento != null
+        ? 'Pago em ${dataCurtaFormat.format(mensalidade.dataPagamento!)}'
+        : 'Vencimento em ${dataCurtaFormat.format(mensalidade.dataVencimento)}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(AppIcons.finance, size: 16, color: colors.textFaint),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  dataCurtaFormat.format(mensalidade.dataVencimento),
+                  style: AppTypography.titleMedium.copyWith(color: colors.text),
+                ),
+                Text(subtitulo, style: AppTypography.bodySmall.copyWith(color: colors.textMuted)),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          AppBadge(
+            _mensalidadeStatusLabel(mensalidade),
+            tone: _mensalidadeStatusTone(mensalidade),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _presencaLabel(PresencaStatus? presenca) => switch (presenca) {
+  PresencaStatus.presente => 'Presente',
+  PresencaStatus.ausente => 'Falta',
+  PresencaStatus.justificada => 'Falta justificada',
+  null => 'Não marcada',
+};
+
+AppBadgeTone _presencaTone(PresencaStatus? presenca) => switch (presenca) {
+  PresencaStatus.presente => AppBadgeTone.success,
+  PresencaStatus.ausente => AppBadgeTone.error,
+  PresencaStatus.justificada => AppBadgeTone.warning,
+  null => AppBadgeTone.neutral,
+};
+
+/// Seção "Frequência" do Detalhe do Aluno — histórico cross-turma (mesmo
+/// propósito de `FrequenciaAluno`, docs/18 MS8): marcar presença continua
+/// exclusivo do Calendário (`CalendarScreen._registrarPresenca`), esta
+/// seção é só leitura. Consome `AulaAlunosApi.listPorAluno(alunoId)`, já
+/// existente desde o Módulo 4 — nenhum endpoint novo.
+class _FrequenciaSection extends ConsumerStatefulWidget {
+  const _FrequenciaSection({required this.alunoId});
+
+  final String alunoId;
+
+  @override
+  ConsumerState<_FrequenciaSection> createState() => _FrequenciaSectionState();
+}
+
+class _FrequenciaSectionState extends ConsumerState<_FrequenciaSection> {
+  Future<PaginatedResult<FrequenciaAluno>>? _future;
+  int _pagina = 1;
+  static const _tamanhoPagina = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  void _carregar() {
+    setState(() {
+      _future = ref
+          .read(aulaAlunosApiProvider)
+          .listPorAluno(widget.alunoId, page: _pagina, pageSize: _tamanhoPagina);
+    });
+  }
+
+  void _irParaPagina(int pagina) {
+    setState(() => _pagina = pagina);
+    _carregar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      title: 'Frequência',
+      child: FutureBuilder<PaginatedResult<FrequenciaAluno>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LoadingSkeleton(width: double.infinity, height: 16),
+                SizedBox(height: AppSpacing.sm),
+                LoadingSkeleton(width: double.infinity, height: 16),
+              ],
+            );
+          }
+          if (snapshot.hasError) {
+            return EmptyState(
+              icon: AppIcons.alert,
+              title: 'Não foi possível carregar a frequência.',
+              actionLabel: 'Tentar novamente',
+              onAction: _carregar,
+            );
+          }
+          final resultado = snapshot.data!;
+          if (resultado.items.isEmpty) {
+            return const EmptyState(
+              icon: AppIcons.attendance,
+              title: 'Nenhuma presença registrada.',
+            );
+          }
+          final colors = context.colors;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < resultado.items.length; i++) ...[
+                if (i > 0) Divider(color: colors.borderSoft, height: 1),
+                _FrequenciaRow(item: resultado.items[i]),
+              ],
+              if (resultado.total > _tamanhoPagina) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AppPagination(
+                  page: resultado.page,
+                  pageSize: resultado.pageSize,
+                  total: resultado.total,
+                  onPageChanged: _irParaPagina,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FrequenciaRow extends StatelessWidget {
+  const _FrequenciaRow({required this.item});
+
+  final FrequenciaAluno item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(AppIcons.attendance, size: 16, color: colors.textFaint),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(item.turmaNome, style: AppTypography.titleMedium.copyWith(color: colors.text)),
+                Text(
+                  dataCurtaFormat.format(item.aulaData),
+                  style: AppTypography.bodySmall.copyWith(color: colors.textMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          AppBadge(_presencaLabel(item.presenca), tone: _presencaTone(item.presenca)),
+        ],
+      ),
+    );
   }
 }
 
