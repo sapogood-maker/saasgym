@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
 
+import 'cargo_label.dart';
+
 /// Sprint 6 (Agenda Avançada) MS4 — busca parametrizada só pelo usuário
 /// autenticado (sem busca/paginação/filtro), mesmo padrão de
 /// `_dashboardProvider`/`_perfilProvider`: `FutureProvider.autoDispose` em
@@ -42,14 +44,6 @@ class AppShell extends ConsumerWidget {
     AppSidebarDestination(label: 'Relatórios', icon: AppIcons.reports, path: '/relatorios', section: 'Operação'),
     AppSidebarDestination(label: 'Meu perfil', icon: AppIcons.profile, path: '/perfil', section: 'Conta'),
   ];
-
-  String _cargoLabel(Role role) => switch (role) {
-    Role.systemAdmin => 'Administrador do sistema',
-    Role.academiaAdmin => 'Administrador',
-    Role.recepcionista => 'Recepção',
-    Role.professor => 'Professor',
-    Role.aluno => 'Aluno',
-  };
 
   String _tituloPagina(String location) {
     final destino = _destinos.firstWhere(
@@ -93,21 +87,28 @@ class AppShell extends ConsumerWidget {
       destinations: _destinos,
       currentPath: location,
       onDestinationSelected: (path) {
-        // No mobile a sidebar vive num Drawer — sem fechar explicitamente,
-        // ele fica aberto por cima da tela nova depois da navegação (o
-        // Scaffold não fecha sozinho ao trocar de rota).
-        if (context.isMobile) {
+        // Em qualquer tela de toque (celular ou tablet) a sidebar vive num
+        // Drawer — sem fechar explicitamente, ele fica aberto por cima da
+        // tela nova depois da navegação (o Scaffold não fecha sozinho ao
+        // trocar de rota). Tablet passou a cair aqui na Sprint 31 (Release
+        // Blockers v1.0) — antes só `isMobile` (&lt;600px) usava o Drawer,
+        // então um tablet em retrato (600-1024px) recebia o mesmo layout de
+        // sidebar fixa do desktop, espremendo o conteúdo (docs/30, achado
+        // Médio). `isTouch` (`!isDesktop`) já existe desde a Sprint de UX
+        // Mobile e já cobre tablet — só faltava o Shell em si usar esse
+        // getter em vez de `isMobile`.
+        if (context.isTouch) {
           _scaffoldKey.currentState?.closeDrawer();
         }
         context.go(path);
       },
       userNome: usuario?.nome ?? '',
-      userCargo: usuario != null ? _cargoLabel(usuario.role) : '',
+      userCargo: usuario != null ? cargoLabel(usuario.role) : '',
       onProfileTap: () => context.go('/perfil'),
       onLogout: () => _sair(context, ref),
     );
 
-    if (context.isMobile) {
+    if (context.isTouch) {
       return Scaffold(
         key: _scaffoldKey,
         drawer: Drawer(width: 260, child: sidebar),

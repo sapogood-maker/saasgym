@@ -5,10 +5,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_core/shared_core.dart';
 
+import '../shell/cargo_label.dart';
+
 final _perfilProvider = FutureProvider.autoDispose<UserProfile>((ref) {
   return ref.watch(usersApiProvider).me();
 });
 
+String _mensagemErroPerfil(Object erro) {
+  if (erro is DioException) {
+    return mensagemErroApi(erro, fallback: 'Não foi possível carregar seu perfil.');
+  }
+  return 'Não foi possível carregar seu perfil.';
+}
+
+/// `/perfil` já vive dentro do `ShellRoute` — `AppShell` já provê
+/// `Scaffold`/`AppHeader`. Antes desta tela montava seu próprio
+/// `Scaffold(appBar: AppBar(...))` por cima disso, único caso assim entre
+/// todas as telas do Shell (Sprint 31, Release Blockers v1.0 — docs/30,
+/// achado Alto: o título acabava usando a tipografia default do Material,
+/// visivelmente diferente do `AppTypography.displayLarge` de toda outra
+/// tela). Devolve só o conteúdo, como Dashboard/Alunos/Planos etc.
 class PerfilScreen extends ConsumerWidget {
   const PerfilScreen({super.key});
 
@@ -16,14 +32,17 @@ class PerfilScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final perfilAsync = ref.watch(_perfilProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Meu perfil')),
-      body: perfilAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (erro, _) =>
-            Center(child: Text('Erro ao carregar perfil: $erro')),
-        data: (perfil) => _PerfilConteudo(perfil: perfil),
+    return perfilAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (erro, _) => Center(
+        child: EmptyState(
+          icon: AppIcons.alert,
+          title: _mensagemErroPerfil(erro),
+          actionLabel: 'Tentar novamente',
+          onAction: () => ref.invalidate(_perfilProvider),
+        ),
       ),
+      data: (perfil) => _PerfilConteudo(perfil: perfil),
     );
   }
 }
@@ -42,6 +61,8 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
   final _nomeFormKey = GlobalKey<FormState>();
   bool _salvandoNome = false;
   bool _enviandoFoto = false;
+  String? _erroNome;
+  String? _erroFoto;
 
   @override
   void dispose() {
@@ -53,7 +74,10 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
     if (!_nomeFormKey.currentState!.validate()) {
       return;
     }
-    setState(() => _salvandoNome = true);
+    setState(() {
+      _salvandoNome = true;
+      _erroNome = null;
+    });
     try {
       await ref
           .read(usersApiProvider)
@@ -65,11 +89,9 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
         ).showSnackBar(const SnackBar(content: Text('Nome atualizado.')));
       }
     } on DioException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
-      }
+      // Erro de formulário usa AppFormErrorBanner, nunca SnackBar (regra do
+      // próprio Design System — Sprint 31, Release Blockers v1.0, docs/30).
+      setState(() => _erroNome = mensagemErroApi(e));
     } finally {
       if (mounted) {
         setState(() => _salvandoNome = false);
@@ -88,18 +110,17 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
     }
     final arquivo = arquivos.first;
 
-    setState(() => _enviandoFoto = true);
+    setState(() {
+      _enviandoFoto = true;
+      _erroFoto = null;
+    });
     try {
       await ref
           .read(usersApiProvider)
           .uploadFoto(bytes: arquivo.bytes!, filename: arquivo.name);
       ref.invalidate(_perfilProvider);
     } on DioException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(mensagemErroApi(e))));
-      }
+      setState(() => _erroFoto = mensagemErroApi(e));
     } finally {
       if (mounted) {
         setState(() => _enviandoFoto = false);
@@ -110,14 +131,17 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
   @override
   Widget build(BuildContext context) {
     final perfil = widget.perfil;
+    final colors = context.colors;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text('Meu perfil', style: AppTypography.displayLarge.copyWith(color: colors.text)),
+            const SizedBox(height: AppSpacing.xl),
             Center(
               child: Stack(
                 children: [
@@ -154,11 +178,15 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
                 ],
               ),
             ),
+            if (_erroFoto != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              AppFormErrorBanner(_erroFoto!),
+            ],
             const SizedBox(height: 8),
             Center(child: Text(perfil.email)),
             Center(
               child: Text(
-                perfil.role.wireValue,
+                cargoLabel(perfil.role),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -197,6 +225,10 @@ class _PerfilConteudoState extends ConsumerState<_PerfilConteudo> {
                 ],
               ),
             ),
+            if (_erroNome != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              AppFormErrorBanner(_erroNome!),
+            ],
             const SizedBox(height: 32),
             const _TrocarSenhaForm(),
           ],
@@ -245,6 +277,18 @@ class _TrocarSenhaFormState extends ConsumerState<_TrocarSenhaForm> {
             currentPassword: _senhaAtualController.text,
             newPassword: _senhaNovaController.text,
           );
+      // Sucesso visível antes de desconectar — sem isso, trocar a senha
+      // parecia uma falha (o usuário via a tela sumir de repente pro
+      // login, sem nenhuma confirmação de que deu certo). Sprint 31,
+      // Release Blockers v1.0, docs/30. O delay é proposital: dá tempo do
+      // SnackBar aparecer antes do `clear()` abaixo derrubar esta tela via
+      // redirect de autenticação.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Senha alterada com sucesso. Faça login novamente.')),
+        );
+        await Future.delayed(const Duration(milliseconds: 1500));
+      }
       // O backend revoga todas as sessões (limpa o cookie de refresh) ao
       // trocar a senha — a sessão local também precisa ser encerrada.
       ref.read(authSessionProvider.notifier).clear();
@@ -303,10 +347,7 @@ class _TrocarSenhaFormState extends ConsumerState<_TrocarSenhaForm> {
           ),
           if (_erro != null) ...[
             const SizedBox(height: 12),
-            Text(
-              _erro!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
+            AppFormErrorBanner(_erro!),
           ],
           const SizedBox(height: 16),
           FilledButton(

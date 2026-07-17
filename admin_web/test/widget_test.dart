@@ -151,6 +151,59 @@ class _AlunosApiVazia extends AlunosApi {
   }
 }
 
+/// Fakes "vazios" pras 3 seções embutidas no Detalhe do Aluno que passaram
+/// a consumir API real na Sprint de Correção de Placeholders (Matrículas/
+/// Financeiro/Frequência) — sem override, `apiClientProvider` tentaria
+/// bater num backend real inexistente no teste de widget.
+class _MatriculasApiVazia extends MatriculasApi {
+  _MatriculasApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<Matricula>> listMatriculas({
+    String? search,
+    String? alunoId,
+    String? planoId,
+    MatriculaStatus? status,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
+  }
+}
+
+class _MensalidadesApiVazia extends MensalidadesApi {
+  _MensalidadesApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<Mensalidade>> listMensalidades({
+    String? search,
+    String? matriculaId,
+    String? alunoId,
+    MensalidadeStatus? status,
+    int? mes,
+    int? ano,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
+  }
+}
+
+class _AulaAlunosApiVazia extends AulaAlunosApi {
+  _AulaAlunosApiVazia() : super(Dio());
+
+  @override
+  Future<PaginatedResult<FrequenciaAluno>> listPorAluno(
+    String alunoId, {
+    String? dataInicio,
+    String? dataFim,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    return const PaginatedResult(items: [], total: 0, page: 1, pageSize: 20);
+  }
+}
+
 /// Fake de ProfessoresApi.list() — mesmo raciocínio de _AlunosApiVazia.
 class _ProfessoresApiVazia extends ProfessoresApi {
   _ProfessoresApiVazia() : super(Dio());
@@ -181,6 +234,19 @@ class _PlanosApiVazia extends PlanosApi {
   }
 }
 
+/// Desktop explícito pra qualquer teste que não seja sobre mobile/tablet —
+/// sem isso, o tamanho padrão da superfície de teste cai na faixa de
+/// tablet (600-1024px), que a partir da Sprint 31 (Release Blockers v1.0)
+/// passou a usar o mesmo layout de toque do celular (Drawer) — correto
+/// pro produto (docs/30, achado Médio), mas quebra testes que esperam a
+/// sidebar fixa sempre visível sem abrir o Drawer primeiro.
+void _usarViewportDesktop(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1440, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
 void main() {
   testWidgets('sem sessão, redireciona para a tela de login', (
     WidgetTester tester,
@@ -195,6 +261,7 @@ void main() {
   testWidgets('com sessão ativa, mostra o shell com o dashboard', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -284,9 +351,58 @@ void main() {
     expect(find.byType(Drawer), findsNothing);
   });
 
+  testWidgets('no tablet (768px), o shell usa Drawer em vez da sidebar fixa de desktop', (
+    WidgetTester tester,
+  ) async {
+    // Sprint 31 (Release Blockers v1.0), docs/30 achado Médio: antes só
+    // `isMobile` (<600px) usava Drawer — um tablet em retrato (600-1024px)
+    // caía no mesmo layout de sidebar fixa do desktop, espremendo o
+    // conteúdo. `AppShell` passou a usar `isTouch` (mobile OU tablet).
+    tester.view.physicalSize = const Size(768, 1024);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    // Sidebar não é fixa — só aparece ao abrir o menu.
+    expect(find.text('Alunos'), findsNothing);
+    expect(find.byTooltip('Menu'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Drawer), findsOneWidget);
+    expect(find.text('Alunos'), findsOneWidget);
+  });
+
   testWidgets('lista de alunos renderiza os itens retornados pela API', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -321,15 +437,19 @@ void main() {
     expect(find.textContaining('11144477735'), findsOneWidget);
   });
 
-  testWidgets('painel de detalhe do aluno mostra dados reais e seções futuras como placeholder', (
+  testWidgets('painel de detalhe do aluno mostra dados reais e seções sem dado como empty state', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
           DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
         ),
         alunosApiProvider.overrideWithValue(_AlunosApiComUmAluno()),
+        matriculasApiProvider.overrideWithValue(_MatriculasApiVazia()),
+        mensalidadesApiProvider.overrideWithValue(_MensalidadesApiVazia()),
+        aulaAlunosApiProvider.overrideWithValue(_AulaAlunosApiVazia()),
       ],
     );
     addTearDown(container.dispose);
@@ -363,16 +483,19 @@ void main() {
     expect(find.text('Editar'), findsOneWidget);
     expect(find.text('Remover'), findsOneWidget);
 
-    // Seções ainda sem funcionalidade aparecem como placeholder com a tag
-    // da sprint responsável — nunca dado inventado.
+    // Matrículas/Financeiro/Frequência consomem API real desde a Sprint de
+    // Correção de Placeholders — sem nenhum registro, mostram empty state
+    // de verdade, nunca mais a tag "MÓDULO N".
     expect(find.text('Matrículas'), findsOneWidget);
-    expect(find.text('MÓDULO 2 · MATRÍCULAS'), findsOneWidget);
-    expect(find.text('MÓDULO 3 · FINANCEIRO'), findsOneWidget);
+    expect(find.text('Nenhuma matrícula encontrada.'), findsOneWidget);
+    expect(find.text('Nenhuma mensalidade encontrada.'), findsOneWidget);
+    expect(find.text('Nenhuma presença registrada.'), findsOneWidget);
   });
 
   testWidgets('lista de professores renderiza os itens retornados pela API', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -412,6 +535,7 @@ void main() {
   testWidgets('lista de planos renderiza os itens retornados pela API', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -449,15 +573,17 @@ void main() {
     expect(find.textContaining('R\$'), findsOneWidget);
   });
 
-  testWidgets('painel de detalhe do plano mostra dados reais e seções futuras como placeholder', (
+  testWidgets('painel de detalhe do plano mostra dados reais e seção sem dado como empty state', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
           DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
         ),
         planosApiProvider.overrideWithValue(_PlanosApiComUmPlano()),
+        matriculasApiProvider.overrideWithValue(_MatriculasApiVazia()),
       ],
     );
     addTearDown(container.dispose);
@@ -491,16 +617,19 @@ void main() {
     expect(find.text('Editar'), findsOneWidget);
     expect(find.text('Remover'), findsOneWidget);
 
-    // Seções ainda sem funcionalidade aparecem como placeholder com a tag
-    // do módulo responsável — nunca dado inventado.
+    // "Alunos matriculados" consome API real desde a Sprint de Correção de
+    // Placeholders — sem nenhuma matrícula, mostra empty state de verdade.
+    // "Financeiro" por plano ainda não tem agregação no backend — continua
+    // sendo o único placeholder remanescente nesta tela (docs/29).
     expect(find.text('Alunos matriculados'), findsOneWidget);
-    expect(find.text('MÓDULO 2 · MATRÍCULAS'), findsOneWidget);
+    expect(find.text('Nenhum aluno matriculado.'), findsOneWidget);
     expect(find.text('MÓDULO 3 · FINANCEIRO'), findsOneWidget);
   });
 
   testWidgets('formulário de plano mostra erro de validação em todos os campos obrigatórios', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -547,6 +676,7 @@ void main() {
   testWidgets('painel de detalhe do professor mostra dados reais e seções futuras como placeholder', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -594,6 +724,7 @@ void main() {
   testWidgets('formulário de professor mostra erro de validação em todos os campos obrigatórios', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(
@@ -640,6 +771,7 @@ void main() {
   testWidgets('formulário de aluno mostra erro de validação em todos os campos obrigatórios', (
     WidgetTester tester,
   ) async {
+    _usarViewportDesktop(tester);
     final container = ProviderContainer(
       overrides: [
         dashboardApiProvider.overrideWithValue(

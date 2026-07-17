@@ -67,13 +67,20 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       // Catálogo interno do Design System — fora do ShellRoute de propósito
-      // (tela cheia própria, sem sidebar/topbar). Link visível na navegação
-      // só em kDebugMode a partir do MS4/MS5 (sidebar rica); por ora,
-      // acessível direto pela URL.
-      GoRoute(
-        path: '/design-system',
-        builder: (context, state) => const DesignSystemGalleryScreen(),
-      ),
+      // (tela cheia própria, sem sidebar/topbar). Só existe em build de
+      // debug (Sprint 31, Release Blockers v1.0): antes a rota era só "sem
+      // link na navegação", mas continuava respondendo pra qualquer usuário
+      // autenticado que digitasse a URL em produção — inclusive um exemplo
+      // desatualizado alegando que o Financeiro "ainda não existe" (docs/30,
+      // achado Alto). `kDebugMode` remove a rota inteira do build de
+      // release: nem o `GoRouter` reconhece o caminho, então não há nada
+      // pra "acessar sem permissão" — a rota simplesmente não existe fora
+      // de desenvolvimento local.
+      if (kDebugMode)
+        GoRoute(
+          path: '/design-system',
+          builder: (context, state) => const DesignSystemGalleryScreen(),
+        ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_core/shared_core.dart';
 
+import 'aula_frequencia_util.dart';
+
 final _formatoDataIso = DateFormat('yyyy-MM-dd');
 
 const _nomesDiaSemana = [
@@ -953,13 +955,6 @@ class _ChipAula extends StatelessWidget {
 
 enum _AcaoAulaView { menu, cancelar, substituto, frequencia }
 
-/// Só aulas realizadas recebem presença (docs/18, seção 5, "Frequência —
-/// invariante 3") — mesmo cálculo de "realizada" usado em toda a Agenda,
-/// nunca armazenado: `status == AGENDADA && data < hoje`.
-bool _aulaRealizada(Aula aula) {
-  return aula.status == AulaStatus.agendada && aula.data.isBefore(_somenteData(DateTime.now()));
-}
-
 /// Diálogo operacional de uma Aula — visualizar/cancelar/definir
 /// substituto/registrar frequência, mesmo chassi multi-view de
 /// `_AcoesRecorrenciaDialog`. Nenhuma tela de detalhe própria (docs/18,
@@ -1193,7 +1188,7 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
               onPressed: () => setState(() => _view = _AcaoAulaView.cancelar),
             ),
           ],
-          if (_aulaRealizada(aula))
+          if (aulaPodeRegistrarFrequencia(aula))
             AppButton(
               label: 'Registrar frequência',
               icon: AppIcons.attendance,
@@ -1202,7 +1197,7 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
             ),
           // Sprint 6 (Agenda Avançada) — origem de reposição também pode
           // ser uma aula cancelada (docs/21, decisão 2), que nunca passa
-          // por `_aulaRealizada` (status != agendada). Reaproveita a mesma
+          // por `aulaPodeRegistrarFrequencia` (status != agendada). Reaproveita a mesma
           // view/mecanismo de "Registrar frequência" — dentro dela, o
           // seletor de presença some quando a aula está cancelada.
           if (!agendada)
@@ -1296,8 +1291,8 @@ class _AulaAcoesDialogState extends ConsumerState<_AulaAcoesDialog> {
     ];
   }
 
-  /// Frequência (MS8) — chega aqui se `_aulaRealizada(aula)` (registrar
-  /// presença) **ou** se `aula.status == cancelada` (Sprint 6, docs/21
+  /// Frequência (MS8) — chega aqui se `aulaPodeRegistrarFrequencia(aula)`
+  /// (registrar presença) **ou** se `aula.status == cancelada` (Sprint 6, docs/21
   /// decisão 2 — origem de reposição também pode ser uma aula cancelada).
   /// Cada linha registra/altera a presença com um único `AppSelect` (mesma
   /// operação pras duas coisas, docs/18 "Frequência — invariante 4"), sem

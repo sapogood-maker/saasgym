@@ -213,6 +213,17 @@ class _PainelFinanceiroScreenState extends ConsumerState<PainelFinanceiroScreen>
   }
 }
 
+/// Sem nenhum lançamento/mensalidade no período — comum numa academia
+/// recém-cadastrada (o piloto vai ver isso no primeiro acesso). Antes
+/// disso, a tabela renderizava só o cabeçalho, sem nenhuma linha nem
+/// explicação (Sprint 31, Release Blockers v1.0 — docs/30, achado
+/// Crítico). Mesmo critério de "tudo zero" já usado em
+/// `relatorios_screen.dart`.
+bool _semDadoFinanceiro(List<EvolucaoMensalItem> itens) {
+  return itens.isEmpty ||
+      itens.every((i) => i.receitaPrevista == 0 && i.receitaRecebida == 0 && i.despesas == 0);
+}
+
 class _EvolucaoTabela extends StatelessWidget {
   const _EvolucaoTabela({required this.itens});
 
@@ -220,6 +231,16 @@ class _EvolucaoTabela extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_semDadoFinanceiro(itens)) {
+      return AppCard(
+        child: EmptyState(
+          icon: AppIcons.finance,
+          title: 'Nenhum dado financeiro neste período',
+          description: 'Assim que houver mensalidades geradas ou lançamentos registrados, a evolução mensal aparece aqui.',
+        ),
+      );
+    }
+
     if (context.isMobile) {
       return Column(
         children: [
