@@ -166,6 +166,12 @@ class _PainelFinanceiroScreenState extends ConsumerState<PainelFinanceiroScreen>
                       label: 'Inadimplência',
                       value: resumo != null ? _formatoMoeda.format(resumo.inadimplenciaValor) : '—',
                       icon: AppIcons.alert,
+                      // Dinheiro em atraso é um problema, não uma métrica
+                      // neutra como "Despesas" — sem isso, os dois cards
+                      // ficavam visualmente empatados (docs/30, achado Alto).
+                      // `error`, não `highlight` (marca): essa é reservada a
+                      // "Saldo do mês", nunca mais de uma métrica por tela.
+                      tone: (resumo?.inadimplenciaQuantidade ?? 0) > 0 ? AppBadgeTone.error : null,
                       loading: carregando,
                       deltaLabel: resumo != null ? '${resumo.inadimplenciaQuantidade} mensalidade(s)' : null,
                     ),

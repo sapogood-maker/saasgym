@@ -80,7 +80,10 @@ class _TurmaDetailScreenState extends ConsumerState<TurmaDetailScreen> {
       context,
       variant: AppConfirmDialogVariant.danger,
       title: 'Remover turma',
-      description: 'Remover ${turma.nome}? O cadastro fica inativo e preservado (nada é apagado permanentemente).',
+      description:
+          'Remover ${turma.nome}? Reservado a corrigir um cadastro feito por engano — some da lista, '
+          'mas nada é apagado permanentemente. Para uma turma que parou de acontecer de verdade, use '
+          'Inativar em vez disto.',
       confirmLabel: 'Remover',
     );
     if (confirmou != true || !mounted) {

@@ -45,6 +45,35 @@ class AppShell extends ConsumerWidget {
     AppSidebarDestination(label: 'Meu perfil', icon: AppIcons.profile, path: '/perfil', section: 'Conta'),
   ];
 
+  /// Dashboard/Mensalidades/Caixa/Painel/Modalidades/Turmas/Calendário/
+  /// Reposições/Relatórios exigem `ACADEMIA_ADMIN` ou `RECEPCIONISTA` no
+  /// backend (`@Roles(...)` em cada controller) — hoje `PROFESSOR` recebe
+  /// 403 em todos esses. Mostrar o item no menu pra quem vai bater nesse
+  /// 403 ao clicar é confuso; a sidebar só deve oferecer o que o papel do
+  /// usuário realmente consegue abrir (docs/30, achado "Fortemente
+  /// recomendado: filtrar a sidebar por papel"). Alunos/Professores/
+  /// Planos/Matrículas/Meu perfil não têm restrição de papel no backend —
+  /// continuam visíveis pros três papéis que acessam o admin_web.
+  static const _apenasAdminOuRecepcao = {
+    '/',
+    '/financeiro/mensalidades',
+    '/financeiro/caixa',
+    '/financeiro/painel',
+    '/agenda/modalidades',
+    '/agenda/turmas',
+    '/agenda/calendario',
+    '/agenda/reposicoes',
+    '/relatorios',
+  };
+
+  List<AppSidebarDestination> _destinosPara(Role? role) {
+    if (role != Role.professor) return _destinos;
+    return [
+      for (final destino in _destinos)
+        if (!_apenasAdminOuRecepcao.contains(destino.path)) destino,
+    ];
+  }
+
   String _tituloPagina(String location) {
     final destino = _destinos.firstWhere(
       (d) => location == d.path || (d.path != '/' && location.startsWith(d.path)),
@@ -84,7 +113,7 @@ class AppShell extends ConsumerWidget {
     final sidebar = AppSidebar(
       academiaNome: usuario?.academiaNome ?? 'SaaSGym',
       planoNome: usuario?.planoNome,
-      destinations: _destinos,
+      destinations: _destinosPara(usuario?.role),
       currentPath: location,
       onDestinationSelected: (path) {
         // Em qualquer tela de toque (celular ou tablet) a sidebar vive num

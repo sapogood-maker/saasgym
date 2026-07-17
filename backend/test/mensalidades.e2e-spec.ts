@@ -234,6 +234,49 @@ describe('Mensalidades (e2e)', () => {
       expect(editada.body.multa).toBe(5);
       expect(editada.body.valorFinal).toBe(135);
     });
+
+    it('bloqueia desconto que deixaria o valor final negativo (validação cruzada)', async () => {
+      const { token } = await cenarioBase('Academia Desconto Invalido E2E');
+      const geradas = await request(app.getHttpServer())
+        .post('/api/financeiro/mensalidades/gerar')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mes: 7, ano: 2026 })
+        .expect(201);
+      const id = geradas.body.criadas[0].id;
+
+      // Matricula de cenarioBase tem valor 150 — desconto de 200 sem multa
+      // deixaria o valorFinal em -50.
+      const resposta = await request(app.getHttpServer())
+        .patch(`/api/financeiro/mensalidades/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ desconto: 200 })
+        .expect(400);
+      expect(resposta.body.message).toContain('valor final da mensalidade negativo');
+
+      // Nada foi alterado — desconto continua 0.
+      const inalterada = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(inalterada.body.desconto).toBe(0);
+    });
+
+    it('permite desconto igual ao valor (valorFinal zero é um estado válido — cortesia)', async () => {
+      const { token } = await cenarioBase('Academia Desconto Total E2E');
+      const geradas = await request(app.getHttpServer())
+        .post('/api/financeiro/mensalidades/gerar')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mes: 7, ano: 2026 })
+        .expect(201);
+      const id = geradas.body.criadas[0].id;
+
+      const editada = await request(app.getHttpServer())
+        .patch(`/api/financeiro/mensalidades/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ desconto: 150 })
+        .expect(200);
+      expect(editada.body.valorFinal).toBe(0);
+    });
   });
 
   describe('Marcar como paga', () => {

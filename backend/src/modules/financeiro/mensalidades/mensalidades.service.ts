@@ -177,6 +177,18 @@ export class MensalidadesService {
     }
     const academiaId = this.tenantContext.getAcademiaId() as string;
 
+    // Validação cruzada (docs/30, item "fortemente recomendado"): desconto e
+    // multa são validados isoladamente pelo DTO (>= 0 cada), mas nada
+    // impedia um desconto maior que valor + multa, resultando num
+    // valorFinal negativo — um estado financeiro sem sentido de negócio.
+    const descontoFinal = dto.desconto ?? Number(atual.desconto);
+    const multaFinal = dto.multa ?? Number(atual.multa);
+    if (valorFinal(Number(atual.valor), descontoFinal, multaFinal) < 0) {
+      throw new BadRequestException(
+        'O desconto não pode deixar o valor final da mensalidade negativo',
+      );
+    }
+
     const mensalidade = await this.prisma.forTenant().mensalidade.update({
       where: { id },
       data: {
@@ -371,11 +383,17 @@ export class MensalidadesService {
     // — truncar "hoje" pro dia em UTC, não a hora corrente, senão uma
     // mensalidade vencendo hoje mais tarde no dia ficaria de fora do `lte`.
     const agora = new Date();
-    const hoje = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()));
+    const hoje = new Date(
+      Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+    );
     const limite = new Date(hoje.getTime() + dias * 24 * 60 * 60 * 1000);
 
     const mensalidades = await this.prisma.forTenant().mensalidade.findMany({
-      where: { status: MensalidadeStatus.PENDENTE, dataVencimento: { lte: limite }, deletedAt: null },
+      where: {
+        status: MensalidadeStatus.PENDENTE,
+        dataVencimento: { lte: limite },
+        deletedAt: null,
+      },
       include: mensalidadeInclude,
       orderBy: { dataVencimento: 'asc' },
       take: MENSALIDADES_ALERTA_LIMITE,

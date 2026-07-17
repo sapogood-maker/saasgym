@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { exceptionFactoryValidacao } from './common/validation/validation-error-messages';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -40,6 +41,10 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      // Sem isso, todo erro de validação sem `message:` customizado (a
+      // maioria dos DTOs) vazaria em inglês pro usuário final — ver
+      // validation-error-messages.ts.
+      exceptionFactory: exceptionFactoryValidacao,
     }),
   );
 

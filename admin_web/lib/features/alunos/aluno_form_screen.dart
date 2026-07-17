@@ -48,6 +48,15 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
   String? _erroCarregamento;
   String? _erroSalvar;
 
+  /// Id do aluno recém-criado nesta sessão do formulário — só usado quando
+  /// `widget.alunoId` é nulo (tela "Novo aluno"). Existe pra cobrir o caso
+  /// em que `create()` teve sucesso mas `uploadFoto()` falhou logo depois:
+  /// sem isso, uma nova tentativa de salvar chamaria `create()` de novo (o
+  /// mesmo `_editando` continuaria `false`), duplicando o cadastro — risco
+  /// identificado em docs/30. Guardar o id aqui faz a tentativa seguinte
+  /// virar `update()`, nunca um segundo `create()`.
+  String? _idRecemCriado;
+
   bool get _editando => widget.alunoId != null;
 
   void _cancelar() => context.backToList('/alunos', result: false);
@@ -131,18 +140,31 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
     }
 
     setState(() => _salvando = true);
+    final alunosApi = ref.read(alunosApiProvider);
+    final payload = _construirPayload();
+    final idParaSalvar = widget.alunoId ?? _idRecemCriado;
+
+    final String alunoId;
+    try {
+      final aluno = idParaSalvar != null
+          ? await alunosApi.update(idParaSalvar, payload)
+          : await alunosApi.create(payload);
+      alunoId = aluno.id;
+      _idRecemCriado ??= alunoId;
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _erroSalvar = mensagemErroApi(e);
+          _salvando = false;
+        });
+      }
+      return;
+    }
 
     try {
-      final alunosApi = ref.read(alunosApiProvider);
-      final payload = _construirPayload();
-      final aluno = _editando
-          ? await alunosApi.update(widget.alunoId!, payload)
-          : await alunosApi.create(payload);
-
       if (_fotoBytes != null) {
-        await alunosApi.uploadFoto(aluno.id, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
+        await alunosApi.uploadFoto(alunoId, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_editando ? 'Aluno atualizado com sucesso.' : 'Aluno cadastrado com sucesso.')),
@@ -150,7 +172,12 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
         context.backToList('/alunos', result: true);
       }
     } on DioException catch (e) {
-      setState(() => _erroSalvar = mensagemErroApi(e));
+      // O cadastro já foi salvo nesse ponto — só a foto falhou. Uma nova
+      // tentativa de "Salvar" vai atualizar o mesmo registro (nunca criar
+      // outro, por causa de `_idRecemCriado` acima) e tentar a foto de novo.
+      if (mounted) {
+        setState(() => _erroSalvar = 'Os dados foram salvos, mas a foto não pôde ser enviada — ${mensagemErroApi(e)}');
+      }
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -208,6 +235,7 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
               imageBytes: _fotoBytes,
               imageUrl: _fotoUrlExistente,
               radius: 48,
+              enabled: !_salvando,
               onPicked: (pick) => setState(() {
                 _fotoBytes = pick.bytes;
                 _fotoNomeArquivo = pick.filename;
@@ -232,7 +260,11 @@ class _AlunoFormScreenState extends ConsumerState<AlunoFormScreen> {
                     label: 'CPF',
                     hintText: '000.000.000-00',
                     controller: _cpfController,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o CPF' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Informe o CPF';
+                      if (!isValidCpf(v)) return 'CPF inválido';
+                      return null;
+                    },
                   ),
                   AppTextField(label: 'RG (opcional)', controller: _rgController),
                 ]),

@@ -65,7 +65,10 @@ class _ProfessorDetailScreenState extends ConsumerState<ProfessorDetailScreen> {
       context,
       variant: AppConfirmDialogVariant.danger,
       title: 'Remover professor',
-      description: 'Remover ${professor.nome}? O cadastro fica inativo e preservado (nada é apagado permanentemente).',
+      description:
+          'Remover ${professor.nome}? Reservado a corrigir um cadastro feito por engano — some da lista, '
+          'mas nada é apagado permanentemente. Para um professor que saiu da academia de verdade, use '
+          'Inativar em vez disto.',
       confirmLabel: 'Remover',
     );
     if (confirmou != true || !mounted) {

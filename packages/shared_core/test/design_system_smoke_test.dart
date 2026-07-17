@@ -147,6 +147,7 @@ void main() {
           children: [
             MetricCard(label: 'Alunos ativos', value: '128', icon: AppIcons.students, highlight: true, deltaLabel: '+6 este mês', trend: AppMetricTrend.up),
             const MetricCard(label: 'Inadimplentes', value: '—'),
+            const MetricCard(label: 'Inadimplência', value: r'R$ 450,00', tone: AppBadgeTone.error),
           ],
         ),
       ),

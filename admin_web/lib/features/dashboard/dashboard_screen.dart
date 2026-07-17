@@ -297,7 +297,10 @@ class _DadosConteudo extends StatelessWidget {
 /// mês anterior — essa curva não existe, ver docs/32 — mas é um número
 /// real, só rotulado com precisão). "Mensalidades vencidas" não recebe seta
 /// de tendência: não existe histórico pra comparar, e mostrar uma seta
-/// aleatória seria inventar direção onde não há dado.
+/// aleatória seria inventar direção onde não há dado — mas ganha
+/// `tone: error` quando há alguma vencida, pra não ficar visualmente
+/// empatada com uma métrica neutra qualquer (docs/30, mesmo achado do
+/// Painel Financeiro).
 class _MetricasPrincipaisRow extends StatelessWidget {
   final DashboardAcademia dashboard;
   final AsyncValue<DashboardExtras> extrasAsync;
@@ -337,6 +340,7 @@ class _MetricasPrincipaisRow extends StatelessWidget {
           label: 'Mensalidades vencidas',
           value: '${dashboard.financeiro.inadimplenciaQuantidade}',
           icon: AppIcons.finance,
+          tone: dashboard.financeiro.inadimplenciaQuantidade > 0 ? AppBadgeTone.error : null,
         ),
         MetricCard(label: 'Aulas hoje', value: '$aulasHojeCount', icon: AppIcons.calendar),
         MetricCard(label: 'Alunos previstos hoje', value: '$alunosPrevistosHoje', icon: AppIcons.activity),
@@ -585,7 +589,13 @@ class _FinanceiroSection extends StatelessWidget {
         spacing: AppSpacing.md,
         runSpacing: AppSpacing.md,
         children: [
-          MetricCard(label: 'Vencidas', value: '$vencidas', icon: AppIcons.alert, width: 200),
+          MetricCard(
+            label: 'Vencidas',
+            value: '$vencidas',
+            icon: AppIcons.alert,
+            width: 200,
+            tone: vencidas > 0 ? AppBadgeTone.error : null,
+          ),
           MetricCard(label: 'Vencem hoje', value: '$venceHoje', icon: AppIcons.clock, width: 200),
           MetricCard(label: 'Vencem esta semana', value: '$venceEstaSemana', icon: AppIcons.calendar, width: 200),
           MetricCard(label: 'Vencem este mês', value: '$venceEsteMes', icon: AppIcons.finance, width: 200),

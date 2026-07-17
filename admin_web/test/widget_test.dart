@@ -492,6 +492,52 @@ void main() {
     expect(find.text('Nenhuma presença registrada.'), findsOneWidget);
   });
 
+  testWidgets('diálogo de "Remover aluno" explica a diferença pra "Inativar" (docs/30, achado Remover≈Inativar)', (
+    WidgetTester tester,
+  ) async {
+    _usarViewportDesktop(tester);
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        alunosApiProvider.overrideWithValue(_AlunosApiComUmAluno()),
+        matriculasApiProvider.overrideWithValue(_MatriculasApiVazia()),
+        mensalidadesApiProvider.overrideWithValue(_MensalidadesApiVazia()),
+        aulaAlunosApiProvider.overrideWithValue(_AulaAlunosApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alunos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Maria Teste'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remover'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Reservado a corrigir um cadastro feito por engano'), findsOneWidget);
+    expect(find.textContaining('use Inativar em vez disto'), findsOneWidget);
+  });
+
   testWidgets('lista de professores renderiza os itens retornados pela API', (
     WidgetTester tester,
   ) async {
@@ -818,5 +864,101 @@ void main() {
     expect(find.text('Informe o telefone'), findsOneWidget);
     expect(find.text('Informe a data de nascimento'), findsOneWidget);
     expect(find.text('Informe o sexo'), findsOneWidget);
+  });
+
+  testWidgets('formulário de aluno rejeita CPF com dígito verificador inválido', (
+    WidgetTester tester,
+  ) async {
+    _usarViewportDesktop(tester);
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        alunosApiProvider.overrideWithValue(_AlunosApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alunos').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Novo aluno'));
+    await tester.pumpAndSettle();
+
+    // CPF=1 (Nome=0, CPF=1, RG=2 ...) — dígito verificador errado de
+    // propósito (o correto seria .35, não .36).
+    await tester.enterText(find.byType(TextField).at(1), '111.444.777-36');
+
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pump();
+
+    expect(find.text('CPF inválido'), findsOneWidget);
+    expect(find.text('Informe o CPF'), findsNothing);
+  });
+
+  testWidgets('formulário de professor rejeita CPF com dígito verificador inválido', (
+    WidgetTester tester,
+  ) async {
+    _usarViewportDesktop(tester);
+    final container = ProviderContainer(
+      overrides: [
+        dashboardApiProvider.overrideWithValue(
+          DashboardApi(Dio()..httpClientAdapter = _AdapterSemRede()),
+        ),
+        professoresApiProvider.overrideWithValue(_ProfessoresApiVazia()),
+      ],
+    );
+    addTearDown(container.dispose);
+    container
+        .read(authSessionProvider.notifier)
+        .setSession(
+          accessToken: 'token-fake',
+          user: const AuthenticatedUser(
+            id: 'user-1',
+            nome: 'Ana Admin',
+            email: 'ana@example.com',
+            role: Role.academiaAdmin,
+            academiaId: 'academia-1',
+          ),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const AdminApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Professores').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Novo professor'));
+    await tester.pumpAndSettle();
+
+    // CPF=1 (Nome=0, CPF=1, Telefone=2 ...) — todos os dígitos iguais,
+    // passa na conta do dígito verificador mas nunca é um CPF real.
+    await tester.enterText(find.byType(TextField).at(1), '111.111.111-11');
+
+    await tester.ensureVisible(find.text('Salvar'));
+    await tester.tap(find.text('Salvar'));
+    await tester.pump();
+
+    expect(find.text('CPF inválido'), findsOneWidget);
+    expect(find.text('Informe o CPF'), findsNothing);
   });
 }

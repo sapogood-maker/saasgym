@@ -34,6 +34,7 @@ export 'src/auth/auth_session.dart';
 export 'src/auth/role.dart';
 export 'src/avaliacoes_fisicas/avaliacao_fisica.dart';
 export 'src/avaliacoes_fisicas/avaliacoes_fisicas_api.dart';
+export 'src/common/cpf_validator.dart';
 export 'src/common/crud_api.dart';
 export 'src/common/date_formats.dart';
 export 'src/common/forma_pagamento.dart';

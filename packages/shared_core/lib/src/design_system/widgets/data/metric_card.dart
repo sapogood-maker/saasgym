@@ -5,6 +5,7 @@ import '../../tokens/app_radius.dart';
 import '../../tokens/app_shadows.dart';
 import '../../tokens/app_spacing.dart';
 import '../../tokens/app_typography.dart';
+import '../feedback/app_badge.dart';
 import '../feedback/loading_skeleton.dart';
 
 /// Direção de tendência de [MetricCard.trend] — controla a cor/ícone da
@@ -27,6 +28,16 @@ class MetricCard extends StatelessWidget {
   final String value;
   final IconData? icon;
   final bool highlight;
+
+  /// Tom semântico de urgência/estado — ex.: [AppBadgeTone.error] pra uma
+  /// métrica que representa um problema (inadimplência), nunca a cor de
+  /// marca (essa é só [highlight], no máximo uma métrica por tela).
+  /// Tinge o chip do ícone e o valor; `null` mantém o tratamento neutro
+  /// padrão. Independente de [highlight] — os dois podem coexistir, ainda
+  /// que a combinação normalmente não faça sentido de produto (marca +
+  /// urgência ao mesmo tempo).
+  final AppBadgeTone? tone;
+
   final String? deltaLabel;
   final AppMetricTrend trend;
   final bool loading;
@@ -43,6 +54,7 @@ class MetricCard extends StatelessWidget {
     required this.value,
     this.icon,
     this.highlight = false,
+    this.tone,
     this.deltaLabel,
     this.trend = AppMetricTrend.neutral,
     this.loading = false,
@@ -58,6 +70,20 @@ class MetricCard extends StatelessWidget {
       AppMetricTrend.neutral => colors.textFaint,
     };
 
+    // `highlight` (marca/dourado) sempre tem prioridade sobre `tone`
+    // (estado semântico) quando os dois estão setados — na prática só um
+    // dos dois é usado por vez (ver doc do campo `tone`).
+    final (Color? toneWash, Color? toneColor) = (highlight || tone == null)
+        ? (null, null)
+        : switch (tone!) {
+            AppBadgeTone.neutral => (colors.cardRaised, colors.textMuted),
+            AppBadgeTone.primary => (colors.primaryWash, colors.primaryStrong),
+            AppBadgeTone.success => (colors.successWash, colors.success),
+            AppBadgeTone.warning => (colors.warningWash, colors.warning),
+            AppBadgeTone.error => (colors.errorWash, colors.error),
+            AppBadgeTone.info => (colors.infoWash, colors.info),
+          };
+
     return SizedBox(
       width: width,
       child: DecoratedBox(
@@ -66,7 +92,7 @@ class MetricCard extends StatelessWidget {
           border: Border.all(
             color: highlight
                 ? colors.primary.withValues(alpha: 0.35)
-                : colors.border,
+                : (toneColor?.withValues(alpha: 0.35) ?? colors.border),
           ),
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: AppShadows.card,
@@ -107,11 +133,11 @@ class MetricCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: highlight
                             ? colors.primaryWash
-                            : colors.cardRaised,
+                            : (toneWash ?? colors.cardRaised),
                         border: Border.all(
                           color: highlight
                               ? colors.primary.withValues(alpha: 0.4)
-                              : colors.border,
+                              : (toneColor?.withValues(alpha: 0.4) ?? colors.border),
                         ),
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
@@ -120,7 +146,7 @@ class MetricCard extends StatelessWidget {
                         child: Icon(
                           icon,
                           size: 15,
-                          color: highlight ? colors.primary : colors.textMuted,
+                          color: highlight ? colors.primary : (toneColor ?? colors.textMuted),
                         ),
                       ),
                     ),
@@ -133,7 +159,7 @@ class MetricCard extends StatelessWidget {
               else
                 Text(
                   value,
-                  style: AppTypography.mono.copyWith(color: colors.text),
+                  style: AppTypography.mono.copyWith(color: toneColor ?? colors.text),
                 ),
               if (deltaLabel != null) ...[
                 const SizedBox(height: AppSpacing.sm),

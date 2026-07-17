@@ -46,7 +46,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(authSessionProvider.notifier)
           .setSession(accessToken: sessao.accessToken!, user: sessao.user!);
       if (mounted) {
-        context.go('/');
+        // Dashboard exige ACADEMIA_ADMIN/RECEPCIONISTA no backend — PROFESSOR
+        // cairia direto num 403 se sempre mandássemos pra "/" (mesma regra
+        // de acesso já refletida no filtro da sidebar, `AppShell`).
+        context.go(sessao.user!.role == Role.professor ? '/alunos' : '/');
       }
     } on DioException catch (e) {
       final mensagem = (e.response?.data is Map)

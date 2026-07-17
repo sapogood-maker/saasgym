@@ -470,7 +470,9 @@ class _AcoesModalidadeDialogState extends ConsumerState<_AcoesModalidadeDialog> 
       variant: AppConfirmDialogVariant.danger,
       title: 'Remover modalidade',
       description:
-          'Remover ${widget.modalidade.nome}? O cadastro fica inativo e preservado (nada é apagado permanentemente).',
+          'Remover ${widget.modalidade.nome}? Reservado a corrigir um cadastro feito por engano — some '
+          'da lista, mas nada é apagado permanentemente. Para uma modalidade que não é mais oferecida '
+          'de verdade, use Inativar em vez disto.',
       confirmLabel: 'Remover',
     );
     if (confirmou != true || !mounted) return;

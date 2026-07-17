@@ -41,6 +41,12 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
   String? _erroCarregamento;
   String? _erroSalvar;
 
+  /// Mesma proteção de `AlunoFormScreen` contra cadastro duplicado quando
+  /// `create()` funciona mas `uploadFoto()` falha logo depois (docs/30):
+  /// guarda o id recém-criado pra que uma nova tentativa vire `update()`,
+  /// nunca um segundo `create()`.
+  String? _idRecemCriado;
+
   bool get _editando => widget.professorId != null;
 
   void _cancelar() => context.backToList('/professores', result: false);
@@ -105,18 +111,31 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
     }
 
     setState(() => _salvando = true);
+    final professoresApi = ref.read(professoresApiProvider);
+    final payload = _construirPayload();
+    final idParaSalvar = widget.professorId ?? _idRecemCriado;
+
+    final String professorId;
+    try {
+      final professor = idParaSalvar != null
+          ? await professoresApi.update(idParaSalvar, payload)
+          : await professoresApi.create(payload);
+      professorId = professor.id;
+      _idRecemCriado ??= professorId;
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _erroSalvar = mensagemErroApi(e);
+          _salvando = false;
+        });
+      }
+      return;
+    }
 
     try {
-      final professoresApi = ref.read(professoresApiProvider);
-      final payload = _construirPayload();
-      final professor = _editando
-          ? await professoresApi.update(widget.professorId!, payload)
-          : await professoresApi.create(payload);
-
       if (_fotoBytes != null) {
-        await professoresApi.uploadFoto(professor.id, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
+        await professoresApi.uploadFoto(professorId, bytes: _fotoBytes!, filename: _fotoNomeArquivo!);
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_editando ? 'Professor atualizado com sucesso.' : 'Professor cadastrado com sucesso.')),
@@ -124,7 +143,11 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
         context.backToList('/professores', result: true);
       }
     } on DioException catch (e) {
-      setState(() => _erroSalvar = mensagemErroApi(e));
+      // O cadastro já foi salvo — só a foto falhou. Uma nova tentativa vai
+      // atualizar o mesmo registro (nunca criar outro) e tentar a foto de novo.
+      if (mounted) {
+        setState(() => _erroSalvar = 'Os dados foram salvos, mas a foto não pôde ser enviada — ${mensagemErroApi(e)}');
+      }
     } finally {
       if (mounted) {
         setState(() => _salvando = false);
@@ -181,6 +204,7 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
               imageBytes: _fotoBytes,
               imageUrl: _fotoUrlExistente,
               radius: 48,
+              enabled: !_salvando,
               onPicked: (pick) => setState(() {
                 _fotoBytes = pick.bytes;
                 _fotoNomeArquivo = pick.filename;
@@ -205,7 +229,11 @@ class _ProfessorFormScreenState extends ConsumerState<ProfessorFormScreen> {
                     label: 'CPF',
                     hintText: '000.000.000-00',
                     controller: _cpfController,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o CPF' : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Informe o CPF';
+                      if (!isValidCpf(v)) return 'CPF inválido';
+                      return null;
+                    },
                   ),
                 ]),
               ],

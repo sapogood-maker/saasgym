@@ -72,7 +72,10 @@ class _PlanoDetailScreenState extends ConsumerState<PlanoDetailScreen> {
       context,
       variant: AppConfirmDialogVariant.danger,
       title: 'Remover plano',
-      description: 'Remover ${plano.nome}? O cadastro fica inativo e preservado (nada é apagado permanentemente).',
+      description:
+          'Remover ${plano.nome}? Reservado a corrigir um cadastro feito por engano — some da lista, '
+          'mas nada é apagado permanentemente. Para parar de vender este plano de verdade, use '
+          'Inativar em vez disto.',
       confirmLabel: 'Remover',
     );
     if (confirmou != true || !mounted) {

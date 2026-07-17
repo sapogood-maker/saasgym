@@ -67,7 +67,10 @@ class _AlunoDetailScreenState extends ConsumerState<AlunoDetailScreen> {
       context,
       variant: AppConfirmDialogVariant.danger,
       title: 'Remover aluno',
-      description: 'Remover ${aluno.nome}? O cadastro fica inativo e preservado (nada é apagado permanentemente).',
+      description:
+          'Remover ${aluno.nome}? Reservado a corrigir um cadastro feito por engano — some da lista, '
+          'mas nada é apagado permanentemente. Para um aluno que saiu da academia de verdade, use '
+          'Inativar em vez disto.',
       confirmLabel: 'Remover',
     );
     if (confirmou != true || !mounted) {

@@ -503,14 +503,23 @@ class _AcoesMensalidadeDialogState extends ConsumerState<_AcoesMensalidadeDialog
   Future<void> _editar() async {
     setState(() => _erro = null);
     if (!_formKey.currentState!.validate()) return;
+
+    final desconto = double.parse(_descontoController.text.trim().replaceAll(',', '.'));
+    final multa = double.parse(_multaController.text.trim().replaceAll(',', '.'));
+    // Cada campo já é validado isoladamente (>= 0) pelo `validator` acima —
+    // esta é a validação cruzada: nada impede um desconto maior que
+    // valor + multa, o que resultaria num valorFinal negativo (mesma regra
+    // reforçada no backend, que é quem realmente decide).
+    if (widget.mensalidade.valor - desconto + multa < 0) {
+      setState(() => _erro = 'O desconto não pode deixar o valor final da mensalidade negativo');
+      return;
+    }
+
     setState(() => _salvando = true);
     try {
       await ref
           .read(mensalidadesApiProvider)
-          .update(widget.mensalidade.id, {
-            'desconto': double.parse(_descontoController.text.trim().replaceAll(',', '.')),
-            'multa': double.parse(_multaController.text.trim().replaceAll(',', '.')),
-          });
+          .update(widget.mensalidade.id, {'desconto': desconto, 'multa': multa});
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (e) {
       setState(() => _erro = mensagemErroApi(e));
