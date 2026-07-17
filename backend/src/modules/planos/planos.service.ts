@@ -123,9 +123,23 @@ export class PlanosService {
     return this.toResponse(plano);
   }
 
+  /// Bloqueia a exclusão se existir qualquer Matricula vinculada — mesmo
+  /// encerrada/cancelada, porque ainda faz parte do histórico da academia
+  /// (Sprint de Integridade Financeira, docs/29, item 2). A alternativa
+  /// correta é inativar (`updateStatus`), que já existe e continua livre.
   async remove(id: string, meta: RequestMetadata = {}): Promise<void> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
+
+    const matriculaVinculada = await this.prisma.forTenant().matricula.findFirst({
+      where: { planoId: id, deletedAt: null },
+    });
+    if (matriculaVinculada) {
+      throw new ConflictException(
+        'Este plano possui matrículas vinculadas e faz parte do histórico da academia.\n\n' +
+          'Ele pode ser inativado, mas não removido.',
+      );
+    }
 
     await this.prisma.forTenant().plano.update({ where: { id }, data: { deletedAt: new Date() } });
 

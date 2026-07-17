@@ -136,6 +136,7 @@ export function createMatriculaFixture(
       createdByUserId,
       valor: 150,
       diaVencimento: 10,
+      periodicidade: 'MENSAL',
       dataInicio,
       dataFimPrevista: dataFim,
       dataFim,

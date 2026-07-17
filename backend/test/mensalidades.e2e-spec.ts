@@ -401,4 +401,72 @@ describe('Mensalidades (e2e)', () => {
         .expect(404);
     });
   });
+
+  /// Sprint de Integridade Financeira (docs/29-auditoria-financeiro-estrutural.md)
+  describe('Duplicidade', () => {
+    it('o banco rejeita duas mensalidades pro mesmo (matriculaId, dataVencimento)', async () => {
+      const { academia, matricula, userId } = await cenarioBase(
+        'Academia Duplicidade Mensalidade E2E',
+      );
+
+      await prisma.mensalidade.create({
+        data: {
+          academiaId: academia.id,
+          matriculaId: matricula.id,
+          alunoId: matricula.alunoId,
+          valor: 150,
+          dataVencimento: new Date('2026-07-10'),
+          createdByUserId: userId,
+        },
+      });
+
+      await expect(
+        prisma.mensalidade.create({
+          data: {
+            academiaId: academia.id,
+            matriculaId: matricula.id,
+            alunoId: matricula.alunoId,
+            valor: 150,
+            dataVencimento: new Date('2026-07-10'),
+            createdByUserId: userId,
+          },
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('gerar() manual não duplica mensalidade já coberta pela geração automática na criação da matrícula', async () => {
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Sem Duplicar Geracao Automatica E2E',
+      });
+      const { token } = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+      const aluno = await createAlunoFixture(prisma, academia.id);
+      const plano = await request(app.getHttpServer())
+        .post('/api/planos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Plano Sem Duplicar E2E', periodicidade: 'MENSAL', valor: 150 })
+        .expect(201);
+
+      const matricula = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.body.id, dataInicio: '2026-07-10' })
+        .expect(201);
+
+      // A mensalidade de julho/2026 já nasceu automaticamente com a
+      // matrícula — chamar "gerar" manualmente pro mesmo mês não duplica.
+      const gerada = await request(app.getHttpServer())
+        .post('/api/financeiro/mensalidades/gerar')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mes: 7, ano: 2026 })
+        .expect(201);
+      expect(gerada.body.criadas).toHaveLength(0);
+      expect(gerada.body.totalPuladas).toBe(1);
+
+      const mensalidades = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${matricula.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(mensalidades.body.total).toBe(1);
+    });
+  });
 });

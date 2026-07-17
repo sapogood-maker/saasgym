@@ -459,9 +459,11 @@ model Plano {
 /// delete (reservado a erro de cadastro — cancelamento de verdade é
 /// status = CANCELADA, não deletedAt, ver docs/16, item 8).
 ///
-/// `valor`/`diaVencimento` são cópias (snapshot) do que foi acordado na
-/// criação — Plano.valor pode mudar depois sem afetar quem já está
-/// matriculado (docs/16, item 1). `planoId` é imutável após a criação:
+/// `valor`/`diaVencimento`/`periodicidade` são cópias (snapshot) do que foi
+/// acordado na criação — Plano.valor/periodicidade podem mudar depois sem
+/// afetar quem já está matriculado (docs/16, item 1; `periodicidade`
+/// adicionada na Sprint de Integridade Financeira, docs/29, pra que a
+/// renovação nunca precise reler o Plano). `planoId` é imutável após a criação:
 /// não existe (nem vai existir) update que troque o plano de uma
 /// matrícula — upgrade/downgrade/renovação são sempre encerrar esta +
 /// criar uma nova (docs/16, item 12). `dataFimPrevista` é calculada uma
@@ -485,8 +487,9 @@ model Matricula {
   createdByUserId String
   createdByUser   User   @relation(fields: [createdByUserId], references: [id])
 
-  valor         Decimal @db.Decimal(10, 2)
+  valor         Decimal       @db.Decimal(10, 2)
   diaVencimento Int
+  periodicidade Periodicidade // snapshot de Plano.periodicidade na criação/renovação — nunca relido do Plano depois (Sprint de Integridade Financeira, docs/29)
 
   dataInicio      DateTime
   dataFimPrevista DateTime
@@ -566,6 +569,7 @@ model Mensalidade {
 
   lancamento Lancamento?
 
+  @@unique([matriculaId, dataVencimento]) // duplicidade nunca deve ser possível pro mesmo par (Sprint de Integridade Financeira, docs/29) — mesma linha nunca cobra o mesmo vencimento duas vezes
   @@index([academiaId])
   @@index([matriculaId])
   @@index([alunoId])

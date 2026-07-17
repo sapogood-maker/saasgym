@@ -600,4 +600,183 @@ describe('Matrículas (e2e)', () => {
       expect(deleteAudit).not.toBeNull();
     });
   });
+
+  /// Sprint de Integridade Financeira (docs/29-auditoria-financeiro-estrutural.md)
+  describe('Sprint de Integridade Financeira', () => {
+    it('criar matrícula (plano MENSAL) gera automaticamente 1 mensalidade cobrindo a vigência inteira', async () => {
+      const { token, aluno, plano } = await cenarioBase('Academia Geracao Automatica Mensal E2E');
+
+      const criada = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.id, dataInicio: '2026-01-10' })
+        .expect(201);
+
+      const mensalidades = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${criada.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(mensalidades.body.total).toBe(1);
+      expect(mensalidades.body.items[0]).toMatchObject({
+        status: 'PENDENTE',
+        valor: criada.body.valor,
+      });
+      expect(mensalidades.body.items[0].dataVencimento.slice(0, 10)).toBe('2026-01-10');
+    });
+
+    it('criar matrícula (plano TRIMESTRAL) gera automaticamente 3 mensalidades, uma por mês da vigência', async () => {
+      const { token, aluno, academia } = await cenarioBase(
+        'Academia Geracao Automatica Trimestral E2E',
+      );
+      const planoTrimestral = await request(app.getHttpServer())
+        .post('/api/planos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Trimestral Geração E2E', periodicidade: 'TRIMESTRAL', valor: 300 })
+        .expect(201);
+
+      const criada = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: planoTrimestral.body.id, dataInicio: '2026-01-10' })
+        .expect(201);
+
+      const mensalidades = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${criada.body.id}&pageSize=50`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(mensalidades.body.total).toBe(3);
+      const vencimentos = mensalidades.body.items
+        .map((m: { dataVencimento: string }) => m.dataVencimento.slice(0, 10))
+        .sort();
+      expect(vencimentos).toEqual(['2026-01-10', '2026-02-10', '2026-03-10']);
+      expect(mensalidades.body.items.every((m: { valor: number }) => m.valor === 300)).toBe(true);
+
+      const geradaAudit = await prisma.auditLog.findFirst({
+        where: { action: 'MENSALIDADE_GERADA', academiaId: academia.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(geradaAudit?.metadata).toMatchObject({
+        matriculaId: criada.body.id,
+        origem: 'matricula_criada',
+        totalGeradas: 3,
+      });
+    });
+
+    it('renovação usa periodicidade/valor/diaVencimento da própria matrícula, nunca do Plano atual', async () => {
+      const { token, aluno, plano } = await cenarioBase(
+        'Academia Renovacao Ignora Plano Atual E2E',
+      );
+
+      const original = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.id, dataInicio: '2026-01-10' })
+        .expect(201);
+      expect(original.body.dataFimPrevista.slice(0, 10)).toBe('2026-02-10'); // MENSAL: +1 mês
+
+      // O Plano muda de MENSAL pra ANUAL e o valor sobe — depois da matrícula
+      // já criada. Se a renovação lesse o Plano ao vivo, a próxima vigência
+      // seria de 12 meses e R$ 999, não 1 mês e o valor original.
+      await request(app.getHttpServer())
+        .patch(`/api/planos/${plano.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ periodicidade: 'ANUAL', valor: 999 })
+        .expect(200);
+
+      const renovada = await request(app.getHttpServer())
+        .post(`/api/matriculas/${original.body.id}/renovar`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(201);
+
+      expect(renovada.body.valor).toBe(original.body.valor); // 150, não 999
+      // dataInicio da renovação = 2026-02-11 (dia seguinte ao dataFim da
+      // anterior); dataFimPrevista tem que ser exatamente +1 mês (MENSAL,
+      // herdada da matrícula), não +12 meses (ANUAL, do Plano ao vivo).
+      expect(renovada.body.dataInicio.slice(0, 10)).toBe('2026-02-11');
+      expect(renovada.body.dataFimPrevista.slice(0, 10)).toBe('2026-03-11');
+
+      const novaNoBanco = await prisma.matricula.findUnique({ where: { id: renovada.body.id } });
+      expect(novaNoBanco?.periodicidade).toBe('MENSAL');
+
+      // A matrícula original, também no banco, nunca muda por causa da
+      // edição do Plano nem da renovação.
+      const originalNoBanco = await prisma.matricula.findUnique({
+        where: { id: original.body.id },
+      });
+      expect(originalNoBanco?.periodicidade).toBe('MENSAL');
+      expect(Number(originalNoBanco?.valor)).toBe(150);
+    });
+
+    it('renovação gera automaticamente as mensalidades da nova vigência', async () => {
+      const { token, aluno, plano } = await cenarioBase('Academia Renovacao Gera Mensalidades E2E');
+
+      const original = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.id, dataInicio: '2026-01-10' })
+        .expect(201);
+
+      const renovada = await request(app.getHttpServer())
+        .post(`/api/matriculas/${original.body.id}/renovar`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({})
+        .expect(201);
+
+      const mensalidadesNovas = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${renovada.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(mensalidadesNovas.body.total).toBe(1);
+      // Vencimento cai no diaVencimento (10, herdado da matrícula original),
+      // não no dia exato de dataInicio da nova vigência (11) — mesmo
+      // critério já usado por `dataVencimentoNoMes` na geração manual.
+      expect(mensalidadesNovas.body.items[0].dataVencimento.slice(0, 10)).toBe('2026-02-10');
+
+      // A mensalidade da matrícula original (janeiro) continua existindo,
+      // intocada — renovar nunca reaproveita nem sobrescreve.
+      const mensalidadesAntigas = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${original.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(mensalidadesAntigas.body.total).toBe(1);
+    });
+
+    it('editar o Plano depois de criar a matrícula não afeta a matrícula existente', async () => {
+      const { token, aluno, plano } = await cenarioBase(
+        'Academia Edicao Plano Nao Afeta Matricula E2E',
+      );
+
+      const criada = await request(app.getHttpServer())
+        .post('/api/matriculas')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ alunoId: aluno.id, planoId: plano.id, dataInicio: '2026-01-10' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/planos/${plano.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ valor: 999, periodicidade: 'ANUAL' })
+        .expect(200);
+
+      const depoisDaEdicao = await request(app.getHttpServer())
+        .get(`/api/matriculas/${criada.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(depoisDaEdicao.body.valor).toBe(criada.body.valor);
+      expect(depoisDaEdicao.body.diaVencimento).toBe(criada.body.diaVencimento);
+      expect(depoisDaEdicao.body.dataFimPrevista).toBe(criada.body.dataFimPrevista);
+      expect(depoisDaEdicao.body.status).toBe('ATIVA');
+
+      // Mensalidades já geradas também continuam com o valor antigo.
+      const mensalidades = await request(app.getHttpServer())
+        .get(`/api/financeiro/mensalidades?matriculaId=${criada.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(mensalidades.body.items[0].valor).toBe(criada.body.valor);
+    });
+  });
 });

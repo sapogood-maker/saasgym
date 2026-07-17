@@ -3,7 +3,11 @@ import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { createTestApp } from './utils/create-test-app';
-import { createAcademiaFixture } from './utils/fixtures';
+import {
+  createAcademiaFixture,
+  createAlunoFixture,
+  createMatriculaFixture,
+} from './utils/fixtures';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const SENHA = 'SenhaForte123';
@@ -349,6 +353,108 @@ describe('Planos (e2e)', () => {
         where: { action: 'PLANO_DELETED', academiaId: academia.id },
       });
       expect(deleteAudit).not.toBeNull();
+    });
+  });
+
+  /// Sprint de Integridade Financeira (docs/29-auditoria-financeiro-estrutural.md)
+  describe('Sprint de Integridade Financeira', () => {
+    it('não permite remover um plano com matrícula vinculada — mensagem amigável, sugere inativar', async () => {
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Plano Com Matricula E2E',
+      });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+      const admin = await prisma.user.findFirstOrThrow({
+        where: { academiaId: academia.id, role: 'ACADEMIA_ADMIN' },
+      });
+
+      const criado = await request(app.getHttpServer())
+        .post('/api/planos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Plano Com Matrícula E2E', periodicidade: 'MENSAL', valor: 100 })
+        .expect(201);
+
+      const aluno = await createAlunoFixture(prisma, academia.id);
+      await createMatriculaFixture(prisma, academia.id, aluno.id, criado.body.id, admin.id);
+
+      const tentativa = await request(app.getHttpServer())
+        .delete(`/api/planos/${criado.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(409);
+      expect(tentativa.body.message).toContain(
+        'Este plano possui matrículas vinculadas e faz parte do histórico da academia.',
+      );
+      expect(tentativa.body.message).toContain('Ele pode ser inativado, mas não removido.');
+
+      // Continua existindo, sem deletedAt.
+      const linhaNoBanco = await prisma.plano.findUnique({ where: { id: criado.body.id } });
+      expect(linhaNoBanco?.deletedAt).toBeNull();
+
+      // A alternativa sugerida (inativar) continua funcionando normalmente.
+      const inativado = await request(app.getHttpServer())
+        .patch(`/api/planos/${criado.body.id}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'INATIVO' })
+        .expect(200);
+      expect(inativado.body.status).toBe('INATIVO');
+    });
+
+    it('permite remover normalmente um plano sem nenhuma matrícula vinculada', async () => {
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Plano Sem Matricula Remocao E2E',
+      });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+
+      const criado = await request(app.getHttpServer())
+        .post('/api/planos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Plano Sem Matrícula E2E', periodicidade: 'MENSAL', valor: 100 })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/api/planos/${criado.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    });
+
+    it('editar valor/periodicidade de um plano com matrícula vinculada não afeta a matrícula existente', async () => {
+      const academia = await createAcademiaFixture(prisma, {
+        nome: 'Academia Editar Plano Com Matricula E2E',
+      });
+      const token = await criarUsuarioELogar(Role.ACADEMIA_ADMIN, academia.id);
+      const admin = await prisma.user.findFirstOrThrow({
+        where: { academiaId: academia.id, role: 'ACADEMIA_ADMIN' },
+      });
+
+      const criado = await request(app.getHttpServer())
+        .post('/api/planos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nome: 'Plano Editável Com Matrícula E2E', periodicidade: 'MENSAL', valor: 100 })
+        .expect(201);
+
+      const aluno = await createAlunoFixture(prisma, academia.id);
+      const matricula = await createMatriculaFixture(
+        prisma,
+        academia.id,
+        aluno.id,
+        criado.body.id,
+        admin.id,
+        { valor: 100, periodicidade: 'MENSAL' },
+      );
+
+      // Edição continua permitida — a Regra 3 do pedido é "manter edição
+      // permitida", não bloquear.
+      const editado = await request(app.getHttpServer())
+        .patch(`/api/planos/${criado.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ valor: 500, periodicidade: 'ANUAL' })
+        .expect(200);
+      expect(editado.body.valor).toBe(500);
+      expect(editado.body.periodicidade).toBe('ANUAL');
+
+      // A matrícula já existente nunca é afetada.
+      const matriculaNoBanco = await prisma.matricula.findUnique({ where: { id: matricula.id } });
+      expect(Number(matriculaNoBanco?.valor)).toBe(100);
+      expect(matriculaNoBanco?.periodicidade).toBe('MENSAL');
     });
   });
 });

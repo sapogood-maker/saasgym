@@ -166,6 +166,7 @@ describe('Notificacoes (e2e)', () => {
           createdByUserId: criador.userId,
           valor: 100,
           diaVencimento: 10,
+          periodicidade: 'MENSAL',
           dataInicio: new Date('2026-01-01'),
           dataFimPrevista: new Date('2027-01-01'),
           dataFim: new Date('2027-01-01'),

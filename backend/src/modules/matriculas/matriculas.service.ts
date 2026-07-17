@@ -18,6 +18,7 @@ import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FileUploadService } from '../../storage/file-upload.service';
 import { AuditService } from '../audit/audit.service';
+import { gerarMensalidadesDaVigencia } from '../financeiro/mensalidades/mensalidades.util';
 
 /// Projeção de leitura pro frontend renderizar a lista sem N+1 (nome do
 /// aluno/plano, foto do aluno) — motivada pela Lista de Matrículas (MS3),
@@ -84,23 +85,48 @@ export class MatriculasService {
 
     const dataInicio = new Date(dto.dataInicio);
     const dataFimPrevista = somarPeriodicidade(dataInicio, plano.periodicidade);
+    const valor = dto.valor ?? Number(plano.valor);
+    // getUTCDate(), não getDate(): dataInicio nasce de um IsDateString
+    // ("2026-01-10") parseado como meia-noite UTC — em fuso negativo
+    // (America/Sao_Paulo, UTC-3) getDate() local voltaria pro dia
+    // anterior (9), o dia errado.
+    const diaVencimento = dto.diaVencimento ?? dataInicio.getUTCDate();
 
-    const matricula = await this.prisma.forTenant().matricula.create({
-      data: {
+    // Matricula + Mensalidades da vigência inteira nascem juntas, na mesma
+    // transação — nunca existe uma matrícula sem suas cobranças já geradas
+    // (Sprint de Integridade Financeira, docs/29, item 4). `tx` não passa
+    // pela extensão de tenant, por isso `academiaId` explícito nas duas
+    // escritas (mesmo padrão já usado em `renovar()`/`MensalidadesService.
+    // marcarPaga`).
+    const { matricula, quantidadeMensalidades } = await this.prisma.$transaction(async (tx) => {
+      const criada = await tx.matricula.create({
+        data: {
+          academiaId,
+          alunoId: dto.alunoId,
+          planoId: dto.planoId,
+          createdByUserId: userId,
+          valor,
+          diaVencimento,
+          periodicidade: plano.periodicidade,
+          dataInicio,
+          dataFimPrevista,
+          dataFim: dataFimPrevista,
+          status: MatriculaStatus.ATIVA,
+        },
+      });
+
+      const geradas = await gerarMensalidadesDaVigencia(tx, {
+        academiaId,
+        matriculaId: criada.id,
         alunoId: dto.alunoId,
-        planoId: dto.planoId,
-        createdByUserId: userId,
-        valor: dto.valor ?? plano.valor,
-        // getUTCDate(), não getDate(): dataInicio nasce de um IsDateString
-        // ("2026-01-10") parseado como meia-noite UTC — em fuso negativo
-        // (America/Sao_Paulo, UTC-3) getDate() local voltaria pro dia
-        // anterior (9), o dia errado.
-        diaVencimento: dto.diaVencimento ?? dataInicio.getUTCDate(),
+        valor,
+        diaVencimento,
         dataInicio,
         dataFimPrevista,
-        dataFim: dataFimPrevista,
-        status: MatriculaStatus.ATIVA,
-      } as Prisma.MatriculaUncheckedCreateInput,
+        createdByUserId: userId,
+      });
+
+      return { matricula: criada, quantidadeMensalidades: geradas };
     });
 
     await this.auditService.record({
@@ -108,6 +134,17 @@ export class MatriculasService {
       academiaId,
       userId,
       metadata: { matriculaId: matricula.id, alunoId: dto.alunoId, planoId: dto.planoId },
+      ...meta,
+    });
+    await this.auditService.record({
+      action: AuditAction.MENSALIDADE_GERADA,
+      academiaId,
+      userId,
+      metadata: {
+        matriculaId: matricula.id,
+        origem: 'matricula_criada',
+        totalGeradas: quantidadeMensalidades,
+      },
       ...meta,
     });
 
@@ -289,6 +326,13 @@ export class MatriculasService {
   /// a nova matrícula herda o mesmo plano da anterior; trocar de plano de
   /// verdade é cancelar esta e criar uma matrícula nova para outro plano
   /// via `create()`, não via `renovar()`.
+  ///
+  /// Nunca lê o `Plano` (Sprint de Integridade Financeira, docs/29, item
+  /// 1): `valor`/`diaVencimento`/`periodicidade` vêm sempre de `atual` (a
+  /// matrícula sendo renovada), nunca do Plano ao vivo — o Plano pode ter
+  /// mudado de preço/periodicidade desde então, e isso não pode vazar pra
+  /// uma renovação silenciosa. A matrícula representa o contrato; a
+  /// renovação respeita o contrato, não o catálogo atual.
   async renovar(
     id: string,
     dto: RenovarMatriculaDto,
@@ -301,35 +345,33 @@ export class MatriculasService {
     const academiaId = this.tenantContext.getAcademiaId() as string;
     const userId = this.tenantContext.getUserId() as string;
 
-    const plano = await this.prisma.forTenant().plano.findFirst({
-      where: { id: atual.planoId, deletedAt: null },
-    });
-    if (!plano) {
-      throw new NotFoundException('Plano não encontrado');
-    }
-
     const dataInicio = dto.dataInicio ? new Date(dto.dataInicio) : somarDias(atual.dataFim, 1);
-    const dataFimPrevista = somarPeriodicidade(dataInicio, plano.periodicidade);
+    const dataFimPrevista = somarPeriodicidade(dataInicio, atual.periodicidade);
+    const valor = dto.valor ?? Number(atual.valor);
+    const diaVencimento = dto.diaVencimento ?? atual.diaVencimento;
 
     // Transação com o client base (não forTenant()) — mesmo padrão já
     // usado em AcademiaProvisioningService/AuthService: dentro de uma
     // transação interativa, academiaId é setado manualmente em cada
     // operação, e o where inclui academiaId explícito (a extensão de
-    // tenant não intercepta `tx`).
-    const nova = await this.prisma.$transaction(async (tx) => {
+    // tenant não intercepta `tx`). A nova matrícula já nasce com as
+    // Mensalidades da vigência inteira geradas (docs/29, item 4), mesmo
+    // mecanismo de `create()`.
+    const { nova, quantidadeMensalidades } = await this.prisma.$transaction(async (tx) => {
       await tx.matricula.update({
         where: { id, academiaId },
         data: { status: MatriculaStatus.ENCERRADA },
       });
 
-      return tx.matricula.create({
+      const criada = await tx.matricula.create({
         data: {
           academiaId,
           alunoId: atual.alunoId,
           planoId: atual.planoId,
           createdByUserId: userId,
-          valor: dto.valor ?? Number(atual.valor),
-          diaVencimento: dto.diaVencimento ?? atual.diaVencimento,
+          valor,
+          diaVencimento,
+          periodicidade: atual.periodicidade,
           dataInicio,
           dataFimPrevista,
           dataFim: dataFimPrevista,
@@ -337,6 +379,19 @@ export class MatriculasService {
           matriculaAnteriorId: atual.id,
         },
       });
+
+      const geradas = await gerarMensalidadesDaVigencia(tx, {
+        academiaId,
+        matriculaId: criada.id,
+        alunoId: atual.alunoId,
+        valor,
+        diaVencimento,
+        dataInicio,
+        dataFimPrevista,
+        createdByUserId: userId,
+      });
+
+      return { nova: criada, quantidadeMensalidades: geradas };
     });
 
     await this.auditService.record({
@@ -357,8 +412,19 @@ export class MatriculasService {
       metadata: { matriculaId: nova.id, renovacaoDe: id },
       ...meta,
     });
+    await this.auditService.record({
+      action: AuditAction.MENSALIDADE_GERADA,
+      academiaId,
+      userId,
+      metadata: {
+        matriculaId: nova.id,
+        origem: 'matricula_renovada',
+        totalGeradas: quantidadeMensalidades,
+      },
+      ...meta,
+    });
 
-    return this.toResponse({ ...nova, aluno: atual.aluno, plano: { nome: plano.nome } });
+    return this.toResponse({ ...nova, aluno: atual.aluno, plano: atual.plano });
   }
 
   /// Reservado a correção de erro de cadastro — cancelamento de verdade é
