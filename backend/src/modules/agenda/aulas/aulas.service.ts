@@ -16,12 +16,18 @@ import { AuditService } from '../../audit/audit.service';
 
 const aulaInclude = {
   professor: { select: { nome: true } },
-  turma: { select: { nome: true, modalidadeId: true, local: true, modalidade: { select: { nome: true } } } },
-  _count: { select: { alunos: true } },
+  turma: {
+    select: { nome: true, modalidadeId: true, local: true, modalidade: { select: { nome: true } } },
+  },
+  // `deletedAt: null` aqui é o que faz `totalAlunos` cair quando o
+  // cascade de encerramento de vínculo (docs/32,
+  // `aluno-encerramento.util.ts`) remove um aluno arquivado/removido de
+  // uma aula futura — sem esse filtro a ocupação continuaria contando a
+  // linha "removida".
+  _count: { select: { alunos: { where: { deletedAt: null } } } },
   // Sprint de UX da Agenda (docs/24, item 6): total de reposições por aula
-  // pro resumo operacional. `_count.select` só aceita 1 filtro por relação,
-  // por isso a contagem de REPOSICAO vem de uma 2ª leitura da mesma relação
-  // (`alunos`, filtrada), não de uma consulta separada — mesma ida ao banco.
+  // pro resumo operacional — 2ª leitura da mesma relação (`alunos`,
+  // filtrada por tipo), não uma consulta separada — mesma ida ao banco.
   alunos: { where: { tipo: AulaAlunoTipo.REPOSICAO, deletedAt: null }, select: { id: true } },
 } satisfies Prisma.AulaInclude;
 
@@ -263,10 +269,7 @@ export class AulasService {
   /// Aula extra (docs/18, "Calendário — invariante 4"): sempre
   /// `recorrenciaId = null`, nunca cria/altera `Recorrencia`. Não popula
   /// `AulaAluno` automaticamente — fora do escopo do MS7 (ver seção 5).
-  async criarExtra(
-    dto: CreateAulaExtraDto,
-    meta: RequestMetadata = {},
-  ): Promise<AulaResponseDto> {
+  async criarExtra(dto: CreateAulaExtraDto, meta: RequestMetadata = {}): Promise<AulaResponseDto> {
     const turma = await this.garantirTurmaExiste(dto.turmaId);
     if (dto.professorId) {
       await this.garantirProfessorExiste(dto.professorId);

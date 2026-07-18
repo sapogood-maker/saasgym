@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction, MatriculaStatus, Prisma } from '@prisma/client';
+import { AuditAction, MatriculaStatus, Prisma, UserStatus } from '@prisma/client';
 import { CreateMatriculaDto } from './dto/create-matricula.dto';
 import { UpdateMatriculaDto } from './dto/update-matricula.dto';
 import { TrancarMatriculaDto } from './dto/trancar-matricula.dto';
@@ -72,6 +72,12 @@ export class MatriculasService {
     });
     if (!aluno) {
       throw new NotFoundException('Aluno não encontrado');
+    }
+    // Um aluno arquivado teve o vínculo encerrado automaticamente
+    // (docs/32) — matriculá-lo de novo exige reativar o cadastro primeiro,
+    // não só ter uma matrícula anterior cancelada fora do caminho.
+    if (aluno.status === UserStatus.INATIVO) {
+      throw new BadRequestException('Aluno está inativo — reative o cadastro antes de matricular');
     }
 
     const plano = await this.prisma.forTenant().plano.findFirst({

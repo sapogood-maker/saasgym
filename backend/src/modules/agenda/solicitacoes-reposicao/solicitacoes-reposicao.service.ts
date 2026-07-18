@@ -1,5 +1,19 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AulaAlunoTipo, AulaStatus, AuditAction, Prisma, Role, SolicitacaoReposicaoStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AulaAlunoTipo,
+  AulaStatus,
+  AuditAction,
+  Prisma,
+  Role,
+  SolicitacaoReposicaoStatus,
+  UserStatus,
+} from '@prisma/client';
 import { CreateSolicitacaoReposicaoDto } from './dto/create-solicitacao-reposicao.dto';
 import { AprovarSolicitacaoReposicaoDto } from './dto/aprovar-solicitacao-reposicao.dto';
 import { RejeitarSolicitacaoReposicaoDto } from './dto/rejeitar-solicitacao-reposicao.dto';
@@ -19,7 +33,9 @@ import {
 
 const solicitacaoInclude = {
   aluno: { select: { nome: true } },
-  aulaAlunoOrigem: { select: { aula: { select: { data: true, turma: { select: { nome: true } } } } } },
+  aulaAlunoOrigem: {
+    select: { aula: { select: { data: true, turma: { select: { nome: true } } } } },
+  },
   aulaDestino: { select: { data: true, turma: { select: { nome: true } } } },
   createdByUser: { select: { nome: true } },
   decidedByUser: { select: { nome: true } },
@@ -76,7 +92,11 @@ export class SolicitacoesReposicaoService {
       action: AuditAction.SOLICITACAO_REPOSICAO_CRIADA,
       academiaId,
       userId,
-      metadata: { solicitacaoId: solicitacao.id, alunoId: origem.alunoId, aulaAlunoOrigemId: origem.id },
+      metadata: {
+        solicitacaoId: solicitacao.id,
+        alunoId: origem.alunoId,
+        aulaAlunoOrigemId: origem.id,
+      },
       ...meta,
     });
 
@@ -85,7 +105,9 @@ export class SolicitacoesReposicaoService {
     return this.toResponse(solicitacao);
   }
 
-  async list(query: ListSolicitacoesReposicaoQueryDto): Promise<PaginatedSolicitacoesReposicaoResponseDto> {
+  async list(
+    query: ListSolicitacoesReposicaoQueryDto,
+  ): Promise<PaginatedSolicitacoesReposicaoResponseDto> {
     const where: Prisma.SolicitacaoReposicaoWhereInput = {};
     if (query.status) {
       where.status = query.status;
@@ -241,19 +263,35 @@ export class SolicitacoesReposicaoService {
   /// mesma comparação de data-only usada em toda a Agenda) **e** (aula
   /// cancelada OU presença marcada como falta). Nunca aula futura, nunca
   /// aula com presença.
+  ///
+  /// Também exige que o aluno esteja `ATIVO` e não removido (docs/32) —
+  /// esta é a única porta de criação de nova reposição que não depende de
+  /// Matrícula/TurmaAluno estarem ativos (a origem é sempre uma falta já
+  /// registrada no passado), então o cascade de encerramento de vínculo
+  /// sozinho não bloqueia isso — precisa da checagem aqui.
   private async garantirOrigemElegivel(
     aulaAlunoOrigemId: string,
   ): Promise<{ id: string; alunoId: string }> {
     const origem = await this.prisma.forTenant().aulaAluno.findFirst({
       where: { id: aulaAlunoOrigemId, deletedAt: null },
-      include: { aula: { select: { data: true, status: true } } },
+      include: {
+        aula: { select: { data: true, status: true } },
+        aluno: { select: { status: true, deletedAt: true } },
+      },
     });
     if (!origem) {
       throw new NotFoundException('Aula/aluno de origem não encontrado');
     }
+    if (origem.aluno.status !== UserStatus.ATIVO || origem.aluno.deletedAt !== null) {
+      throw new BadRequestException(
+        'Não é possível solicitar reposição para um aluno inativo ou removido',
+      );
+    }
 
     const hoje = new Date();
-    const inicioHoje = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()));
+    const inicioHoje = new Date(
+      Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()),
+    );
     if (origem.aula.data.getTime() >= inicioHoje.getTime()) {
       throw new BadRequestException('Só é possível solicitar reposição de uma aula já realizada');
     }
@@ -298,7 +336,9 @@ export class SolicitacoesReposicaoService {
       throw new BadRequestException('A aula de destino precisa estar agendada (não cancelada)');
     }
     const hoje = new Date();
-    const inicioHoje = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()));
+    const inicioHoje = new Date(
+      Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate()),
+    );
     if (destino.data.getTime() < inicioHoje.getTime()) {
       throw new BadRequestException('A aula de destino precisa ser uma aula futura');
     }
@@ -353,7 +393,9 @@ export class SolicitacoesReposicaoService {
         mensagem: `A reposição de ${solicitacao.aluno.nome} foi aprovada para ${this.formatarData(solicitacao.aulaDestino!.data)} (${solicitacao.aulaDestino!.turma.nome}).`,
       });
     } else if (solicitacao.status === SolicitacaoReposicaoStatus.REJEITADA) {
-      const sufixoMotivo = solicitacao.motivoRejeicao ? ` Motivo: ${solicitacao.motivoRejeicao}` : '';
+      const sufixoMotivo = solicitacao.motivoRejeicao
+        ? ` Motivo: ${solicitacao.motivoRejeicao}`
+        : '';
       await this.notificationProvider.notify({
         userId: solicitacao.createdByUserId,
         titulo: 'Solicitação de reposição rejeitada',
