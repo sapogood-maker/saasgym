@@ -103,6 +103,28 @@ class _Header extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (nome != null && nome!.trim().isNotEmpty) ...[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [colors.primaryWash, colors.card],
+                stops: const [0, 0.7],
+              ),
+              border: Border.all(color: colors.primary.withValues(alpha: 0.35)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                _iniciais(nome!),
+                style: AppTypography.titleLarge.copyWith(color: colors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,18 +197,36 @@ class _DadosErro extends StatelessWidget {
 }
 
 /// Cabeçalho leve reutilizado entre as seções "Financeiro", "Indicadores
-/// rápidos" e "Pendências" — mesmo padrão textual que já existia (Text em
-/// `titleMedium`/`textMuted`), só extraído porque agora se repete 3 vezes.
+/// rápidos" e "Pendências" — um ícone temático (chip com fundo sutil) +
+/// texto, em vez de só texto cinza solto, pra dar uma âncora visual a cada
+/// bloco secundário sem competir com os cards em si.
 class _SectionLabel extends StatelessWidget {
   final String texto;
+  final IconData icon;
 
-  const _SectionLabel(this.texto);
+  const _SectionLabel(this.texto, {required this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Text(texto, style: AppTypography.titleMedium.copyWith(color: context.colors.textMuted)),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.cardRaised,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              child: Icon(icon, size: 14, color: colors.textMuted),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(texto, style: AppTypography.titleMedium.copyWith(color: colors.textMuted)),
+        ],
+      ),
     );
   }
 }
@@ -244,10 +284,10 @@ class _DadosConteudo extends StatelessWidget {
 
         // ---------- Linha 3 — aniversariantes ----------
         _AniversariantesSection(aniversariantes: dashboard.aniversariantes, hoje: hoje),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.xxl),
 
         // ---------- Linha 4 — financeiro ----------
-        _SectionLabel('Financeiro'),
+        _SectionLabel('Financeiro', icon: AppIcons.finance),
         extrasAsync.when(
           loading: () => const AppCard(loading: true),
           error: (_, _) => const AppCard(
@@ -263,7 +303,7 @@ class _DadosConteudo extends StatelessWidget {
         const SizedBox(height: AppSpacing.xl),
 
         // ---------- Linha 5 — indicadores rápidos ----------
-        _SectionLabel('Indicadores rápidos'),
+        _SectionLabel('Indicadores rápidos', icon: AppIcons.activity),
         extrasAsync.when(
           loading: () => const AppCard(loading: true),
           error: (_, _) => const AppCard(
@@ -274,7 +314,7 @@ class _DadosConteudo extends StatelessWidget {
         const SizedBox(height: AppSpacing.xl),
 
         // ---------- Linha 6 — pendências ----------
-        _SectionLabel('Pendências'),
+        _SectionLabel('Pendências', icon: AppIcons.pendingActions),
         extrasAsync.when(
           loading: () => const AppCard(loading: true),
           error: (_, _) => const AppCard(child: Text('Não foi possível carregar as pendências.')),
@@ -437,13 +477,29 @@ class _ResumoSemanaSection extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      child: LinearProgressIndicator(
-                        value: maiorContagem == 0 ? 0 : (contagem[dia] ?? 0) / maiorContagem,
-                        minHeight: 6,
-                        backgroundColor: colors.cardRaised,
-                        color: dia == hoje ? colors.primary : colors.info,
+                    child: SizedBox(
+                      height: 6,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: Container(
+                          color: colors.cardRaised,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: maiorContagem == 0 ? 0 : (contagem[dia] ?? 0) / maiorContagem,
+                              heightFactor: 1,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: dia == hoje
+                                        ? [colors.primary.withValues(alpha: 0.6), colors.primary]
+                                        : [colors.info.withValues(alpha: 0.6), colors.info],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
