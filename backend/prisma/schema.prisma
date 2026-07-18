@@ -60,6 +60,7 @@ enum AuditAction {
   ALUNO_UPDATED
   ALUNO_STATUS_CHANGED
   ALUNO_DELETED
+  ALUNO_VINCULO_ENCERRADO
   PROFESSOR_CREATED
   PROFESSOR_UPDATED
   PROFESSOR_STATUS_CHANGED
@@ -154,6 +155,11 @@ enum MotivoCancelamento {
   ALUNO_SOLICITOU
   INADIMPLENCIA
   ACADEMIA_CANCELOU
+  /// Nunca escolhido manualmente na UI — só o cascade de encerramento de
+  /// vínculo (`aluno-encerramento.util.ts`) usa este motivo, quando arquivar
+  /// ou remover um Aluno encerra automaticamente sua Matrícula ATIVA/
+  /// TRANCADA (docs/32).
+  ALUNO_ARQUIVADO
   OUTRO
 }
 
