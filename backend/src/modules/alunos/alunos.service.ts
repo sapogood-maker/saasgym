@@ -1,10 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Aluno, Arquivo, AuditAction, Prisma } from '@prisma/client';
+import { Aluno, Arquivo, AuditAction, Prisma, UserStatus } from '@prisma/client';
 import { CreateAlunoDto } from './dto/create-aluno.dto';
 import { AlunoResponseDto, PaginatedAlunosResponseDto } from './dto/aluno-response.dto';
 import { ListAlunosQueryDto } from './dto/list-alunos-query.dto';
 import { UpdateAlunoDto } from './dto/update-aluno.dto';
 import { UpdateAlunoStatusDto } from './dto/update-aluno-status.dto';
+import { encerrarVinculoDoAluno, ResumoEncerramentoVinculo } from './aluno-encerramento.util';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { RequestMetadata } from '../../common/utils/request-metadata';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -127,6 +128,14 @@ export class AlunosService {
     return this.toResponse(aluno);
   }
 
+  /// Arquivar (`status = INATIVO`) encerra o vínculo do aluno com a
+  /// academia — Matrícula ativa, inscrições de turma, aulas futuras e
+  /// reposições pendentes (docs/32). Tudo dentro da mesma transação da
+  /// própria mudança de status: ou os dois acontecem juntos, ou nenhum
+  /// acontece — nunca um aluno arquivado com vínculos "fantasma" por
+  /// causa de uma falha no meio do caminho. Reativar (`status = ATIVO`)
+  /// não tem cascade nenhum — o aluno só volta a poder ser matriculado de
+  /// novo (`MatriculasService.create()` já exige `status = ATIVO`).
   async updateStatus(
     id: string,
     dto: UpdateAlunoStatusDto,
@@ -134,35 +143,88 @@ export class AlunosService {
   ): Promise<AlunoResponseDto> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
+    const userId = this.tenantContext.getUserId() as string;
 
-    const aluno = await this.prisma.forTenant().aluno.update({
-      where: { id },
-      data: { status: dto.status },
-      include: { fotoArquivo: true },
+    const { aluno, resumoEncerramento } = await this.prisma.$transaction(async (tx) => {
+      const atualizado = await tx.aluno.update({
+        where: { id, academiaId },
+        data: { status: dto.status },
+        include: { fotoArquivo: true },
+      });
+
+      const resumo =
+        dto.status === UserStatus.INATIVO
+          ? await encerrarVinculoDoAluno(tx, { academiaId, alunoId: id, userId })
+          : null;
+
+      return { aluno: atualizado, resumoEncerramento: resumo };
     });
 
     await this.auditService.record({
       action: AuditAction.ALUNO_STATUS_CHANGED,
       academiaId,
-      userId: this.tenantContext.getUserId(),
+      userId,
       metadata: { alunoId: id, statusNovo: dto.status, motivo: dto.motivo },
       ...meta,
     });
+    if (resumoEncerramento) {
+      await this.registrarEncerramentoVinculo(
+        id,
+        'arquivamento',
+        resumoEncerramento,
+        academiaId,
+        userId,
+        meta,
+      );
+    }
 
     return this.toResponse(aluno);
   }
 
+  /// Reservado a correção de erro de cadastro — mesmo assim encerra o
+  /// vínculo igual arquivar (docs/32): um aluno removido não pode deixar
+  /// pra trás uma matrícula ativa ou inscrições de turma "fantasma" só
+  /// porque a ação foi "Remover" em vez de "Inativar".
   async remove(id: string, meta: RequestMetadata = {}): Promise<void> {
     await this.findOrThrow(id);
     const academiaId = this.tenantContext.getAcademiaId() as string;
+    const userId = this.tenantContext.getUserId() as string;
 
-    await this.prisma.forTenant().aluno.update({ where: { id }, data: { deletedAt: new Date() } });
+    const resumoEncerramento = await this.prisma.$transaction(async (tx) => {
+      await tx.aluno.update({ where: { id, academiaId }, data: { deletedAt: new Date() } });
+      return encerrarVinculoDoAluno(tx, { academiaId, alunoId: id, userId });
+    });
 
     await this.auditService.record({
       action: AuditAction.ALUNO_DELETED,
       academiaId,
-      userId: this.tenantContext.getUserId(),
+      userId,
       metadata: { alunoId: id },
+      ...meta,
+    });
+    await this.registrarEncerramentoVinculo(
+      id,
+      'remocao',
+      resumoEncerramento,
+      academiaId,
+      userId,
+      meta,
+    );
+  }
+
+  private async registrarEncerramentoVinculo(
+    alunoId: string,
+    origem: 'arquivamento' | 'remocao',
+    resumo: ResumoEncerramentoVinculo,
+    academiaId: string,
+    userId: string,
+    meta: RequestMetadata,
+  ): Promise<void> {
+    await this.auditService.record({
+      action: AuditAction.ALUNO_VINCULO_ENCERRADO,
+      academiaId,
+      userId,
+      metadata: { alunoId, origem, ...resumo },
       ...meta,
     });
   }
