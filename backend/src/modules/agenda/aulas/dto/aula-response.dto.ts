@@ -50,6 +50,13 @@ export class AulaResponseDto {
   @ApiProperty({ description: 'Quantidade de AulaAluno com tipo = REPOSICAO nesta aula' })
   totalReposicoes!: number;
 
+  @ApiProperty({
+    type: [String],
+    description:
+      'Nomes dos alunos vinculados a esta aula, ordenados — vazio quando a consulta não pediu `incluirAlunos` (docs/33)',
+  })
+  alunosNomes!: string[];
+
   @ApiProperty({ nullable: true, description: 'Local/sala da Turma (Turma.local, texto livre)' })
   local!: string | null;
 

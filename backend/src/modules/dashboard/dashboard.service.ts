@@ -48,7 +48,9 @@ export class DashboardService {
     // aulas de hoje anteriores ao horário atual ficariam de fora do
     // filtro `gte` (docs/22, "Fuso horário de hoje/semana").
     const agora = new Date();
-    const hoje = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()));
+    const hoje = new Date(
+      Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+    );
     const fimJanelaSemana = new Date(hoje.getTime() + DIAS_JANELA_SEMANA * 24 * 60 * 60 * 1000);
 
     const [
@@ -80,6 +82,7 @@ export class DashboardService {
       this.aulasService.listCalendario({
         dataInicio: hoje.toISOString(),
         dataFim: fimJanelaSemana.toISOString(),
+        incluirAlunos: false,
         page: 1,
         pageSize: AULAS_SEMANA_LIMITE,
       }),

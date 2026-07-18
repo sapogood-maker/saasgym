@@ -33,6 +33,26 @@ const aulaInclude = {
 
 type AulaComRelacoes = Prisma.AulaGetPayload<{ include: typeof aulaInclude }>;
 
+// Sprint "Agenda operacional" (docs/33) — só usado por `paginar()` quando
+// `incluirAlunos` é pedido (Dia/Semana da Agenda). Prisma não permite
+// incluir a mesma relação (`alunos`) duas vezes com filtros diferentes no
+// mesmo `include`, então este é um include ALTERNATIVO (não um adicional):
+// busca todos os AulaAluno ativos (não só REPOSICAO) já com o nome do
+// aluno — de onde `totalReposicoes` E `alunosNomes` são derivados juntos,
+// sem nenhuma consulta a mais que a variante padrão acima.
+const aulaIncludeComAlunos = {
+  professor: aulaInclude.professor,
+  turma: aulaInclude.turma,
+  _count: aulaInclude._count,
+  alunos: {
+    where: { deletedAt: null },
+    select: { tipo: true, aluno: { select: { nome: true } } },
+    orderBy: { aluno: { nome: 'asc' } },
+  },
+} satisfies Prisma.AulaInclude;
+
+type AulaComAlunosDetalhados = Prisma.AulaGetPayload<{ include: typeof aulaIncludeComAlunos }>;
+
 /// Gerador de Aulas (MS6) + Calendário (MS7) — **invariantes explícitas
 /// antes de qualquer código (docs/18, seção 5)**:
 ///
@@ -169,7 +189,7 @@ export class AulasService {
       };
     }
 
-    return this.paginar(where, query.page, query.pageSize);
+    return this.paginar(where, query.page, query.pageSize, false);
   }
 
   /// Calendário (MS7) — lista `Aula`s de toda a academia (não aninhado
@@ -197,7 +217,7 @@ export class AulasService {
       where.status = query.status;
     }
 
-    return this.paginar(where, query.page, query.pageSize);
+    return this.paginar(where, query.page, query.pageSize, query.incluirAlunos);
   }
 
   async findOne(id: string): Promise<AulaResponseDto> {
@@ -325,24 +345,28 @@ export class AulasService {
     where: Prisma.AulaWhereInput,
     page: number,
     pageSize: number,
+    incluirAlunos: boolean,
   ): Promise<PaginatedAulasResponseDto> {
+    const skip = (page - 1) * pageSize;
+    const orderBy = { data: 'asc' as const };
+
+    if (incluirAlunos) {
+      const [items, total] = await Promise.all([
+        this.prisma
+          .forTenant()
+          .aula.findMany({ where, include: aulaIncludeComAlunos, skip, take: pageSize, orderBy }),
+        this.prisma.forTenant().aula.count({ where }),
+      ]);
+      return { items: items.map((aula) => this.toResponseComAlunos(aula)), total, page, pageSize };
+    }
+
     const [items, total] = await Promise.all([
-      this.prisma.forTenant().aula.findMany({
-        where,
-        include: aulaInclude,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { data: 'asc' },
-      }),
+      this.prisma
+        .forTenant()
+        .aula.findMany({ where, include: aulaInclude, skip, take: pageSize, orderBy }),
       this.prisma.forTenant().aula.count({ where }),
     ]);
-
-    return {
-      items: items.map((aula) => this.toResponse(aula)),
-      total,
-      page,
-      pageSize,
-    };
+    return { items: items.map((aula) => this.toResponse(aula)), total, page, pageSize };
   }
 
   private async garantirTurmaExiste(turmaId: string) {
@@ -376,6 +400,27 @@ export class AulasService {
 
   private toResponse(aula: AulaComRelacoes): AulaResponseDto {
     return {
+      ...this.camposComuns(aula),
+      totalReposicoes: aula.alunos.length,
+      alunosNomes: [],
+    };
+  }
+
+  /// Só para `paginar(..., incluirAlunos: true)` — deriva `totalReposicoes`
+  /// E `alunosNomes` da MESMA leitura de `alunos` (docs/33), em vez da
+  /// leitura separada, já filtrada a REPOSICAO, que `toResponse` usa.
+  private toResponseComAlunos(aula: AulaComAlunosDetalhados): AulaResponseDto {
+    return {
+      ...this.camposComuns(aula),
+      totalReposicoes: aula.alunos.filter((a) => a.tipo === AulaAlunoTipo.REPOSICAO).length,
+      alunosNomes: aula.alunos.map((a) => a.aluno.nome),
+    };
+  }
+
+  private camposComuns(
+    aula: Omit<AulaComRelacoes, 'alunos'> | Omit<AulaComAlunosDetalhados, 'alunos'>,
+  ): Omit<AulaResponseDto, 'totalReposicoes' | 'alunosNomes'> {
+    return {
       id: aula.id,
       turmaId: aula.turmaId,
       turmaNome: aula.turma.nome,
@@ -391,7 +436,6 @@ export class AulasService {
       status: aula.status,
       motivoCancelamento: aula.motivoCancelamento,
       totalAlunos: aula._count.alunos,
-      totalReposicoes: aula.alunos.length,
       local: aula.turma.local,
       createdAt: aula.createdAt,
     };
