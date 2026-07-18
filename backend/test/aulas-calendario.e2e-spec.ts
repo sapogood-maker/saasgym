@@ -48,7 +48,12 @@ describe('Aulas Calendario (e2e)', () => {
     const turma = await request(app.getHttpServer())
       .post('/api/agenda/turmas')
       .set('Authorization', `Bearer ${token}`)
-      .send({ nome: 'Turma Calendário', modalidadeId: modalidade.id, professorId: professor.id, local })
+      .send({
+        nome: 'Turma Calendário',
+        modalidadeId: modalidade.id,
+        professorId: professor.id,
+        local,
+      })
       .expect(201);
 
     await request(app.getHttpServer())
@@ -99,7 +104,9 @@ describe('Aulas Calendario (e2e)', () => {
   });
 
   it('PROFESSOR não tem acesso (403)', async () => {
-    const academia = await createAcademiaFixture(prisma, { nome: 'Academia Calendario Prof Sem Acesso E2E' });
+    const academia = await createAcademiaFixture(prisma, {
+      nome: 'Academia Calendario Prof Sem Acesso E2E',
+    });
     const { token } = await criarUsuarioELogar(Role.PROFESSOR, academia.id);
 
     await request(app.getHttpServer())
@@ -132,7 +139,10 @@ describe('Aulas Calendario (e2e)', () => {
       const auditEntry = await prisma.auditLog.findFirst({
         where: { action: 'AULA_CANCELADA', academiaId: academia.id },
       });
-      expect(auditEntry?.metadata).toMatchObject({ aulaId: aula.id, motivoCancelamento: 'Feriado municipal' });
+      expect(auditEntry?.metadata).toMatchObject({
+        aulaId: aula.id,
+        motivoCancelamento: 'Feriado municipal',
+      });
     });
 
     it('id inexistente -> 404', async () => {
@@ -148,7 +158,8 @@ describe('Aulas Calendario (e2e)', () => {
 
   describe('Professor substituto', () => {
     it('define substituto — só Aula.professorId muda, Turma/Recorrencia continuam com o titular', async () => {
-      const { academia, token, professor, turma, aula } = await cenarioComAula('Academia Substituto E2E');
+      const { academia, token, professor, turma, aula } =
+        await cenarioComAula('Academia Substituto E2E');
       const substituto = await createProfessorFixture(prisma, academia.id);
 
       const atualizada = await request(app.getHttpServer())
@@ -161,7 +172,9 @@ describe('Aulas Calendario (e2e)', () => {
       const turmaAtual = await prisma.turma.findUniqueOrThrow({ where: { id: turma.id } });
       expect(turmaAtual.professorId).toBe(professor.id);
 
-      const recorrenciaAtual = await prisma.recorrencia.findFirstOrThrow({ where: { turmaId: turma.id } });
+      const recorrenciaAtual = await prisma.recorrencia.findFirstOrThrow({
+        where: { turmaId: turma.id },
+      });
       expect(recorrenciaAtual.professorId).toBeNull();
 
       const auditEntry = await prisma.auditLog.findFirst({
@@ -298,15 +311,19 @@ describe('Aulas Calendario (e2e)', () => {
         .get(`/api/agenda/aulas?turmaId=${turma.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(porTurma.body.items.every((a: { turmaId: string }) => a.turmaId === turma.id)).toBe(true);
+      expect(porTurma.body.items.every((a: { turmaId: string }) => a.turmaId === turma.id)).toBe(
+        true,
+      );
 
       const porProfessor = await request(app.getHttpServer())
         .get(`/api/agenda/aulas?professorId=${professor.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(porProfessor.body.items.every((a: { professorId: string }) => a.professorId === professor.id)).toBe(
-        true,
-      );
+      expect(
+        porProfessor.body.items.every(
+          (a: { professorId: string }) => a.professorId === professor.id,
+        ),
+      ).toBe(true);
 
       const porModalidade = await request(app.getHttpServer())
         .get(`/api/agenda/aulas?modalidadeId=${modalidade.id}`)
@@ -330,7 +347,9 @@ describe('Aulas Calendario (e2e)', () => {
         .get(`/api/agenda/aulas?status=AGENDADA&turmaId=${turma.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(porStatusAgendada.body.items.some((a: { id: string }) => a.id === aula.id)).toBe(false);
+      expect(porStatusAgendada.body.items.some((a: { id: string }) => a.id === aula.id)).toBe(
+        false,
+      );
     });
   });
 
@@ -375,9 +394,92 @@ describe('Aulas Calendario (e2e)', () => {
     });
   });
 
+  describe('incluirAlunos — Agenda operacional (docs/33)', () => {
+    it('sem incluirAlunos (padrão) -> alunosNomes vem vazio mesmo com alunos na aula', async () => {
+      const { academia, token, turma, aula } = await cenarioComAula(
+        'Academia IncluirAlunos Default E2E',
+      );
+      const aluno = await createAlunoFixture(prisma, academia.id);
+      await prisma.aulaAluno.create({
+        data: { academiaId: academia.id, aulaId: aula.id, alunoId: aluno.id, tipo: 'MATRICULADO' },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/agenda/aulas?turmaId=${turma.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const aulaAtualizada = res.body.items.find((a: { id: string }) => a.id === aula.id);
+      expect(aulaAtualizada.totalAlunos).toBe(1);
+      expect(aulaAtualizada.alunosNomes).toEqual([]);
+    });
+
+    it('incluirAlunos=true -> alunosNomes traz os nomes ordenados, na MESMA consulta (sem round-trip extra)', async () => {
+      const { academia, token, turma, aula } = await cenarioComAula(
+        'Academia IncluirAlunos True E2E',
+      );
+      const alunoZ = await createAlunoFixture(prisma, academia.id, { nome: 'Zeca Pagodinho' });
+      const alunoA = await createAlunoFixture(prisma, academia.id, { nome: 'Ana Beatriz' });
+      await prisma.aulaAluno.create({
+        data: { academiaId: academia.id, aulaId: aula.id, alunoId: alunoZ.id, tipo: 'MATRICULADO' },
+      });
+      await prisma.aulaAluno.create({
+        data: { academiaId: academia.id, aulaId: aula.id, alunoId: alunoA.id, tipo: 'REPOSICAO' },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/agenda/aulas?turmaId=${turma.id}&incluirAlunos=true`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const aulaAtualizada = res.body.items.find((a: { id: string }) => a.id === aula.id);
+      expect(aulaAtualizada.totalAlunos).toBe(2);
+      expect(aulaAtualizada.totalReposicoes).toBe(1);
+      expect(aulaAtualizada.alunosNomes).toEqual(['Ana Beatriz', 'Zeca Pagodinho']);
+    });
+
+    it('incluirAlunos=true -> aluno removido (soft delete) não aparece em alunosNomes', async () => {
+      const { academia, token, turma, aula } = await cenarioComAula(
+        'Academia IncluirAlunos SoftDelete E2E',
+      );
+      const alunoAtivo = await createAlunoFixture(prisma, academia.id, { nome: 'Aluno Ativo' });
+      const alunoRemovido = await createAlunoFixture(prisma, academia.id, {
+        nome: 'Aluno Removido',
+      });
+      await prisma.aulaAluno.create({
+        data: {
+          academiaId: academia.id,
+          aulaId: aula.id,
+          alunoId: alunoAtivo.id,
+          tipo: 'MATRICULADO',
+        },
+      });
+      await prisma.aulaAluno.create({
+        data: {
+          academiaId: academia.id,
+          aulaId: aula.id,
+          alunoId: alunoRemovido.id,
+          tipo: 'MATRICULADO',
+          deletedAt: new Date(),
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/agenda/aulas?turmaId=${turma.id}&incluirAlunos=true`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const aulaAtualizada = res.body.items.find((a: { id: string }) => a.id === aula.id);
+      expect(aulaAtualizada.totalAlunos).toBe(1);
+      expect(aulaAtualizada.alunosNomes).toEqual(['Aluno Ativo']);
+    });
+  });
+
   describe('Soft delete (correção de cadastro)', () => {
     it('DELETE não remove fisicamente — some da listagem mas continua no banco com deletedAt', async () => {
-      const { academia, token, aula } = await cenarioComAula('Academia Soft Delete Aula Calendario E2E');
+      const { academia, token, aula } = await cenarioComAula(
+        'Academia Soft Delete Aula Calendario E2E',
+      );
 
       await request(app.getHttpServer())
         .delete(`/api/agenda/aulas/${aula.id}`)
