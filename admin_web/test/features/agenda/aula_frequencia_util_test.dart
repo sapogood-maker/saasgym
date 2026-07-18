@@ -28,6 +28,7 @@ Aula _aula({
     motivoCancelamento: null,
     totalAlunos: 5,
     totalReposicoes: 0,
+    alunosNomes: const [],
     local: null,
     createdAt: DateTime(2026, 1, 1),
   );

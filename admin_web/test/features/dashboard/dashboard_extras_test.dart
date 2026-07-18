@@ -41,6 +41,7 @@ Aula _aula({required DateTime data, AulaStatus status = AulaStatus.agendada}) {
     motivoCancelamento: null,
     totalAlunos: 5,
     totalReposicoes: 0,
+    alunosNomes: const [],
     local: 'Sala 1',
     createdAt: DateTime.utc(2026, 1, 1),
   );
