@@ -57,6 +57,7 @@ class AulasApi {
     String? professorId,
     String? modalidadeId,
     AulaStatus? status,
+    bool incluirAlunos = false,
     int page = 1,
     int pageSize = 100,
   }) async {
@@ -69,6 +70,7 @@ class AulasApi {
         'professorId': ?professorId,
         'modalidadeId': ?modalidadeId,
         'status': ?status?.wireValue,
+        'incluirAlunos': incluirAlunos,
         'page': page,
         'pageSize': pageSize,
       },
