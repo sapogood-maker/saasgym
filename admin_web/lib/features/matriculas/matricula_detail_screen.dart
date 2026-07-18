@@ -544,6 +544,11 @@ String _motivoCancelamentoLabel(MotivoCancelamento motivo) => switch (motivo) {
   MotivoCancelamento.alunoSolicitou => 'Aluno solicitou',
   MotivoCancelamento.inadimplencia => 'Inadimplência',
   MotivoCancelamento.academiaCancelou => 'Academia cancelou',
+  // Nunca escolhido manualmente (não aparece nas opções do diálogo acima)
+  // — só o cascade automático de arquivamento/remoção de aluno usa esse
+  // motivo (docs/32), mas a matrícula já cancelada continua exibindo o
+  // motivo real aqui, em vez de quebrar o switch exaustivo.
+  MotivoCancelamento.alunoArquivado => 'Aluno arquivado',
   MotivoCancelamento.outro => 'Outro',
 };
 

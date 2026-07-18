@@ -4,6 +4,10 @@ enum MotivoCancelamento {
   alunoSolicitou('ALUNO_SOLICITOU'),
   inadimplencia('INADIMPLENCIA'),
   academiaCancelou('ACADEMIA_CANCELOU'),
+  /// Nunca escolhido manualmente na UI — só o backend usa, quando arquivar
+  /// ou remover um Aluno encerra automaticamente a Matrícula dele
+  /// (docs/32).
+  alunoArquivado('ALUNO_ARQUIVADO'),
   outro('OUTRO');
 
   const MotivoCancelamento(this.wireValue);

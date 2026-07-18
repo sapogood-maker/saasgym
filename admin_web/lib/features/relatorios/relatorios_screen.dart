@@ -20,6 +20,7 @@ String _motivoLabel(MotivoCancelamento motivo) => switch (motivo) {
   MotivoCancelamento.alunoSolicitou => 'Aluno solicitou',
   MotivoCancelamento.inadimplencia => 'Inadimplência',
   MotivoCancelamento.academiaCancelou => 'Academia cancelou',
+  MotivoCancelamento.alunoArquivado => 'Aluno arquivado',
   MotivoCancelamento.outro => 'Outro',
 };
 
